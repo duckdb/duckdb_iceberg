@@ -4,15 +4,19 @@
 
 # Before we load the extension, this will fail
 statement error
-SELECT iceberg('Sam');
+SELECT hello_world_yyjson('Sam');
 ----
-Catalog Error: Scalar Function with name iceberg does not exist!
+Catalog Error: Scalar Function with name hello_world_yyjson does not exist!
 
 # Require statement will ensure this test is run with this extension loaded
 require iceberg
 
-# Confirm the extension works
 query I
-SELECT iceberg('Sam');
+SELECT hello_world_yyjson('{"hello": "world"}');
 ----
-Iceberg Sam 🐥
+world
+
+query I
+SELECT hello_world_yyjson('{"hello": "sir"}');
+----
+sir

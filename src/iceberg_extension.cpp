@@ -5,20 +5,35 @@
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/function/scalar_function.hpp"
-
+#include "yyjson.hpp"
 
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 
 namespace duckdb {
 
-inline void IcebergScalarFun(DataChunk &args, ExpressionState &state, Vector &result) {
+inline void JsonHelloWorld(DataChunk &args, ExpressionState &state, Vector &result) {
     auto &name_vector = args.data[0];
     UnaryExecutor::Execute<string_t, string_t>(
-	    name_vector, result, args.size(),
-	    [&](string_t name) { 
-			return StringVector::AddString(result, "Iceberg "+name.GetString()+" 🐥");;
+        name_vector, result, args.size(),
+        [&](string_t json_string) {
+
+          // Read JSON and get root
+          yyjson_doc *doc = yyjson_read(json_string.GetDataUnsafe(), json_string.GetSize(), 0);
+          yyjson_val *root = yyjson_doc_get_root(doc);
+
+          // Get root["hello"]
+          yyjson_val *hello_value = yyjson_obj_get(root, "hello");
+
+          string_t res = StringVector::AddString(result, yyjson_get_str(hello_value), yyjson_get_len(hello_value));
+
+          // Free the doc
+          yyjson_doc_free(doc);
+
+          return res;
         });
 }
+
+
 
 static void LoadInternal(DatabaseInstance &instance) {
 	Connection con(instance);
@@ -27,9 +42,10 @@ static void LoadInternal(DatabaseInstance &instance) {
     auto &catalog = Catalog::GetSystemCatalog(*con.context);
 
     CreateScalarFunctionInfo iceberg_fun_info(
-            ScalarFunction("iceberg", {LogicalType::VARCHAR}, LogicalType::VARCHAR, IcebergScalarFun));
+            ScalarFunction("hello_world_yyjson", {LogicalType::VARCHAR}, LogicalType::VARCHAR, JsonHelloWorld));
     iceberg_fun_info.on_conflict = OnCreateConflict::ALTER_ON_CONFLICT;
     catalog.CreateFunction(*con.context, &iceberg_fun_info);
+
     con.Commit();
 }
 

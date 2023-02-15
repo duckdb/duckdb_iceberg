@@ -7,7 +7,13 @@ set(EXTENSION_NAME ${TARGET_NAME}_extension)
 project(${TARGET_NAME})
 include_directories(src/include)
 
-set(EXTENSION_SOURCES src/iceberg_extension.cpp)
+include_directories(duckdb/extension/json/yyjson/include)
+include_directories(duckdb/extension/json/include)
+
+set(EXTENSION_SOURCES
+        src/iceberg_extension.cpp
+        ${YYJSON_OBJECT_FILES})
+
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 
 set(PARAMETERS "-warnings")
