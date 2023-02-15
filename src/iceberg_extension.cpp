@@ -11,6 +11,15 @@
 
 namespace duckdb {
 
+// TODO 2:
+// Table Function ICEBERG_SNAPSHOTS('path')
+// - Read the version hint
+// - Read the Json thing
+// - List snapshots with all the info we want
+
+// TODO 2:
+// - hello world with avro
+
 inline void JsonHelloWorld(DataChunk &args, ExpressionState &state, Vector &result) {
     auto &name_vector = args.data[0];
     UnaryExecutor::Execute<string_t, string_t>(
@@ -32,8 +41,6 @@ inline void JsonHelloWorld(DataChunk &args, ExpressionState &state, Vector &resu
           return res;
         });
 }
-
-
 
 static void LoadInternal(DatabaseInstance &instance) {
 	Connection con(instance);
