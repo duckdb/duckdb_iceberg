@@ -1,0 +1,58 @@
+# name: test/sql/iceberg.test
+# description: test iceberg extension
+# group: [iceberg]
+
+# Before we load the extension, this will fail
+statement error
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg');
+----
+Catalog Error: Table Function with name iceberg_scan does not exist!
+
+require iceberg
+
+# Scanning latest snapshot
+query I
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg');
+----
+2
+
+# Scanning specific snapshot
+query I
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', 3776207205136740581::UBIGINT);
+----
+1
+
+query I
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', 7635660646343998149::UBIGINT);
+----
+2
+
+# Scanning latest snapshot at specific moment in time
+# note in the data we have:
+#   1 = 2023-02-15 15:07:54.504
+#	2 = 2023-02-15 15:08:14.73
+query I
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.504'::TIMESTAMP);
+----
+1
+
+query I
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.505'::TIMESTAMP);
+----
+1
+
+query I
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.729'::TIMESTAMP);
+----
+1
+
+query I
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:08:14.73'::TIMESTAMP);
+----
+2
+
+
+statement error
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.503'::TIMESTAMP);
+----
+IO Error: Could not find latest snapshots for timestamp 2023-02-15 15:07:54.503

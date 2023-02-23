@@ -1,0 +1,22 @@
+# name: test/sql/iceberg_snapshots.test
+# description: test iceberg snapshots function
+# group: [iceberg]
+
+# Before we load the extension, this will fail
+statement error
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg');
+----
+Catalog Error: Table Function with name iceberg_snapshots does not exist!
+
+require iceberg
+
+query IIIII
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg');
+----
+1	3776207205136740581	2023-02-15 15:07:54.504	0	lineitem_iceberg/metadata/snap-3776207205136740581-1-cf3d0be5-cf70-453d-ad8f-48fdc412e608.avro
+2	7635660646343998149	2023-02-15 15:08:14.73	0	lineitem_iceberg/metadata/snap-7635660646343998149-1-10eaca8a-1e1c-421e-ad6d-b232e5ee23d3.avro
+
+statement error
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_nonexistent');
+----
+IO Error: Cannot open file "data/iceberg/lineitem_iceberg_nonexistent/metadata/version-hint.text": No such file or directory

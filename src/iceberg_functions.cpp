@@ -13,6 +13,7 @@ vector<CreateTableFunctionInfo> IcebergFunctions::GetTableFunctions() {
   vector<CreateTableFunctionInfo> functions;
 
   functions.push_back(GetIcebergSnapshotsFunction());
+  functions.push_back(GetIcebergScanFunction());
 
   return functions;
 }

@@ -19,6 +19,7 @@ public:
   static vector<CreateTableFunctionInfo> GetTableFunctions();
 private:
   static CreateTableFunctionInfo GetIcebergSnapshotsFunction();
+  static CreateTableFunctionInfo GetIcebergScanFunction();
 };
 
 } // namespace duckdb
