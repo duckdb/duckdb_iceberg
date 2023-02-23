@@ -4,19 +4,21 @@
 
 # Before we load the extension, this will fail
 statement error
-SELECT hello_world_yyjson('Sam');
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg');
 ----
-Catalog Error: Scalar Function with name hello_world_yyjson does not exist!
+Catalog Error: Table Function with name iceberg_snapshots does not exist!
 
 # Require statement will ensure this test is run with this extension loaded
 require iceberg
 
-query I
-SELECT hello_world_yyjson('{"hello": "world"}');
+### ICEBERG_SNAPSHOTS
+query IIIII
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg');
 ----
-world
+1	3776207205136740581	1676473674504	0	lineitem_iceberg/metadata/snap-3776207205136740581-1-cf3d0be5-cf70-453d-ad8f-48fdc412e608.avro
+2	7635660646343998149	1676473694730	0	lineitem_iceberg/metadata/snap-7635660646343998149-1-10eaca8a-1e1c-421e-ad6d-b232e5ee23d3.avro
 
-query I
-SELECT hello_world_yyjson('{"hello": "sir"}');
+statement error
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg2');
 ----
-sir
+IO Error: Cannot open file "data/iceberg/lineitem_iceberg2/metadata/version-hint.text": No such file or directory
