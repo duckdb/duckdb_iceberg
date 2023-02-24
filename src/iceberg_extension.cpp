@@ -17,18 +17,18 @@ namespace duckdb {
 // - hello world with avro
 
 static void LoadInternal(DatabaseInstance &instance) {
-    Connection con(instance);
-    con.BeginTransaction();
-    auto &context = *con.context;
+	Connection con(instance);
+	con.BeginTransaction();
+	auto &context = *con.context;
 
-    auto &catalog = Catalog::GetSystemCatalog(*con.context);
+	auto &catalog = Catalog::GetSystemCatalog(*con.context);
 
-    // Iceberg Table Functions
-    for (auto &fun : IcebergFunctions::GetTableFunctions()) {
-      catalog.CreateTableFunction(context, &fun);
-    }
+	// Iceberg Table Functions
+	for (auto &fun : IcebergFunctions::GetTableFunctions()) {
+		catalog.CreateTableFunction(context, &fun);
+	}
 
-    con.Commit();
+	con.Commit();
 }
 
 void IcebergExtension::Load(DuckDB &db) {

@@ -10,12 +10,12 @@
 namespace duckdb {
 
 vector<CreateTableFunctionInfo> IcebergFunctions::GetTableFunctions() {
-  vector<CreateTableFunctionInfo> functions;
+	vector<CreateTableFunctionInfo> functions;
 
-  functions.push_back(GetIcebergSnapshotsFunction());
-  functions.push_back(GetIcebergScanFunction());
+	functions.push_back(GetIcebergSnapshotsFunction());
+	functions.push_back(GetIcebergScanFunction());
 
-  return functions;
+	return functions;
 }
 
-}
+} // namespace duckdb

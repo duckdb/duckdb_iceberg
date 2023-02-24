@@ -16,10 +16,11 @@ namespace duckdb {
 
 class IcebergFunctions {
 public:
-  static vector<CreateTableFunctionInfo> GetTableFunctions();
+	static vector<CreateTableFunctionInfo> GetTableFunctions();
+
 private:
-  static CreateTableFunctionInfo GetIcebergSnapshotsFunction();
-  static CreateTableFunctionInfo GetIcebergScanFunction();
+	static CreateTableFunctionInfo GetIcebergSnapshotsFunction();
+	static CreateTableFunctionInfo GetIcebergScanFunction();
 };
 
 } // namespace duckdb
