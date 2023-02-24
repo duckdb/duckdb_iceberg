@@ -1,12 +1,12 @@
 #define DUCKDB_EXTENSION_MAIN
 
 #include "iceberg_extension.hpp"
-#include "iceberg_functions.hpp"
 
 #include "duckdb.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/function/scalar_function.hpp"
+#include "iceberg_functions.hpp"
 #include "yyjson.hpp"
 
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>

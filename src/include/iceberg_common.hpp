@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "yyjson.hpp"
 #include "duckdb.hpp"
 #include "duckdb/common/printer.hpp"
+#include "yyjson.hpp"
 
 namespace duckdb {
 

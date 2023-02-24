@@ -1,10 +1,8 @@
-#include "iceberg_functions.hpp"
-#include "iceberg_common.hpp"
-#include "yyjson.hpp"
-
 #include "duckdb/common/file_opener.hpp"
 #include "duckdb/common/file_system.hpp"
-#include "duckdb/common/file_system.hpp"
+#include "iceberg_common.hpp"
+#include "iceberg_functions.hpp"
+#include "yyjson.hpp"
 
 #include <string>
 
