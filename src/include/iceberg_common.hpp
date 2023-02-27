@@ -11,10 +11,14 @@
 #include "duckdb.hpp"
 #include "duckdb/common/printer.hpp"
 #include "yyjson.hpp"
+#include <avro.h>
+#include <iostream>
+#include <string.h>
 
 namespace duckdb {
 
-struct IceBergSnapshot {
+//! An entry in the metadata.json snapshots field
+struct IcebergSnapshot {
 	uint64_t snapshot_id;
 	uint64_t sequence_number;
 	uint64_t schema_id;
@@ -22,6 +26,171 @@ struct IceBergSnapshot {
 	timestamp_t timestamp_ms;
 };
 
+enum class IcebergManifestContentType : uint8_t {
+	DATA = 0,
+	DELETE = 1
+};
+
+//! An entry in the manifest list file (top level AVRO file)
+struct IcebergManifest {
+	//! Path to the manifest AVRO file
+	string manifest_path;
+	//! sequence_number when manifest was added to table (0 for Iceberg v1)
+	int64_t sequence_number;
+	//! either data or deletes
+	IcebergManifestContentType content;
+};
+
+enum class IcebergManifestEntryStatusType : uint8_t {
+	EXISTING = 0,
+	ADDED = 1,
+	DELETED = 2
+};
+
+enum class IcebergManifestEntryContentType : uint8_t {
+	DATA = 0,
+	POSITION_DELETES = 1,
+	EQUALITY_DELETES = 2
+};
+
+//! An entry in a manifest file
+struct IcebergManifestEntry {
+	IcebergManifestEntryStatusType status;
+
+	//! ----- Data File Struct ------
+	IcebergManifestEntryContentType content;
+	string file_path;
+	string file_format;
+	int64_t record_count;
+};
+
+// ---------------------------------------- MISC ---------------------------------------------------
+static string FileToString(const string &path, FileSystem &fs) {
+	auto handle = fs.OpenFile(path, FileFlags::FILE_FLAGS_READ);
+	auto file_size = handle->GetFileSize();
+	string ret_val(file_size, ' ');
+	handle->Read((char *)ret_val.c_str(), file_size);
+	return ret_val;
+}
+
+//! Get the relative path to an iceberg resource
+//! it appears that iceberg contain information on their folder name
+static string GetFullPath(const string& iceberg_path, const string& relative_file_path, FileSystem& fs) {
+	auto res = relative_file_path.find_first_of(fs.PathSeparator());
+	if (res == string::npos) {
+		throw IOException("Invalid iceberg path found: " + relative_file_path);
+	}
+
+	return fs.JoinPath(iceberg_path, relative_file_path.substr(res+1));
+}
+
+// ----------------------------------------- AVRO ----------------------------------------------------
+static vector<IcebergManifest> ParseManifests(avro_file_reader_t db, avro_schema_t reader_schema)
+{
+	vector<IcebergManifest> ret;
+
+	avro_value_iface_t  *manifest_class =
+	    avro_generic_class_from_schema(reader_schema);
+
+	avro_value_t manifest;
+	avro_generic_value_new(manifest_class, &manifest);
+
+	while (!avro_file_reader_read_value(db, &manifest)) {
+		const char *path_string = nullptr;
+		size_t path_size = 0;
+		avro_value_t path_value {nullptr, nullptr};
+
+		if (avro_value_get_by_name(&manifest, "manifest_path", &path_value, nullptr) == 0) {
+			avro_value_get_string(&path_value, &path_string, &path_size);
+//			std::cout << "Path read: " << string(path_string, path_size-1) << "\n";
+		}
+
+		avro_value_t content_value ;
+		int content = 0;
+		if (avro_value_get_by_name(&manifest, "content", &content_value, nullptr) == 0) {
+			avro_value_get_int(&content_value, &content);
+		}
+
+//		std::cout << "content_value read: " << to_string(content) << "\n";
+
+		avro_value_t sequence_number_value;
+		int64_t sequence_number = 0;
+		if (avro_value_get_by_name(&manifest, "sequence_number", &sequence_number_value, nullptr) == 0) {
+			avro_value_get_long(&sequence_number_value, &sequence_number);
+		}
+//		std::cout << "Sequence number read: " << to_string(sequence_number) << "\n";
+
+		ret.push_back({string(path_string, path_size), sequence_number, (IcebergManifestContentType)content});
+	}
+	avro_value_decref(&manifest);
+	avro_value_iface_decref(manifest_class);
+
+	return ret;
+}
+
+static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, avro_schema_t reader_schema)
+{
+	vector<IcebergManifestEntry> ret;
+
+	avro_value_iface_t  *manifest_entry_class =
+	    avro_generic_class_from_schema(reader_schema);
+
+	avro_value_t manifest;
+	avro_generic_value_new(manifest_entry_class, &manifest);
+
+	while (!avro_file_reader_read_value(db, &manifest)) {
+		avro_value_t status_value;
+		int status = 0;
+		if (avro_value_get_by_name(&manifest, "status", &status_value, nullptr) == 0) {
+			avro_value_get_int(&status_value, &status);
+		}
+
+		if (avro_record_get())
+		//		std::cout << "Sequence number read: " << to_string(sequence_number) << "\n";
+
+		ret.push_back({(IcebergManifestEntryStatusType)status, (IcebergManifestEntryContentType)0, "", "", 0});
+	}
+	avro_value_decref(&manifest);
+	avro_value_iface_decref(manifest_entry_class);
+
+	return ret;
+}
+
+static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs) {
+	// TODO dumb AVRO C API doesn't expose the right functions to read from memory for some reason, use the disk FS for now
+//	auto avro_file = FileToString(path, fs);
+
+	avro_file_reader_t reader;
+
+	auto res = avro_file_reader(path.c_str(), &reader);
+	if (res) {
+		throw IOException("Failed to open avro file " + string(strerror(res)));
+	}
+
+	auto read_schema = avro_file_reader_get_writer_schema(reader);
+
+	return ParseManifests(reader, read_schema);
+}
+
+static vector<IcebergManifestEntry> ReadManifestEntry(string path, FileSystem &fs) {
+	// TODO dumb AVRO C API doesn't expose the right functions to read from memory for some reason, use the disk FS for now
+//	auto avro_file = FileToString(path, fs);
+
+	avro_file_reader_t reader;
+
+	auto res = avro_file_reader(path.c_str(), &reader);
+	if (res) {
+		throw IOException("Failed to open avro file " + string(strerror(res)));
+	}
+
+	auto read_schema = avro_file_reader_get_writer_schema(reader);
+
+	return ParseManifestEntries(reader, read_schema);
+}
+
+
+
+// ---------------------------------------- YYJSON ---------------------------------------------------
 static uint64_t TryGetNumFromObject(yyjson_val *obj, string field) {
 	auto val = yyjson_obj_getn(obj, field.c_str(), field.size());
 	if (!val || yyjson_get_tag(val) != YYJSON_TYPE_NUM) {
@@ -38,8 +207,8 @@ static string TryGetStrFromObject(yyjson_val *obj, string field) {
 	return yyjson_get_str(val);
 }
 
-static IceBergSnapshot ParseSnapShot(yyjson_val *snapshot) {
-	IceBergSnapshot ret;
+static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot) {
+	IcebergSnapshot ret;
 
 	auto snapshot_tag = yyjson_get_tag(snapshot);
 	if (snapshot_tag != YYJSON_TYPE_OBJ) {
@@ -53,14 +222,6 @@ static IceBergSnapshot ParseSnapShot(yyjson_val *snapshot) {
 	ret.manifest_list = TryGetStrFromObject(snapshot, "manifest-list");
 
 	return ret;
-}
-
-static string FileToString(const string &path, FileSystem &fs) {
-	auto handle = fs.OpenFile(path, FileFlags::FILE_FLAGS_READ);
-	auto file_size = handle->GetFileSize();
-	string ret_val(file_size, ' ');
-	handle->Read((char *)ret_val.c_str(), file_size);
-	return ret_val;
 }
 
 static idx_t GetTableVersion(string &path, FileSystem &fs) {
@@ -142,7 +303,7 @@ static string ReadMetaData(string &path, FileSystem &fs) {
 	return FileToString(metadata_file_path, fs);
 }
 
-static IceBergSnapshot GetLatestSnapshot(string &path, FileSystem &fs) {
+static IcebergSnapshot GetLatestSnapshot(string &path, FileSystem &fs) {
 	auto metadata_json = ReadMetaData(path, fs);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto root = yyjson_doc_get_root(doc);
@@ -156,7 +317,7 @@ static IceBergSnapshot GetLatestSnapshot(string &path, FileSystem &fs) {
 	return ParseSnapShot(latest_snapshot);
 }
 
-static IceBergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id) {
+static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id) {
 	auto metadata_json = ReadMetaData(path, fs);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto root = yyjson_doc_get_root(doc);
@@ -170,7 +331,7 @@ static IceBergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snaps
 	return ParseSnapShot(snapshot);
 }
 
-static IceBergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp) {
+static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp) {
 	auto metadata_json = ReadMetaData(path, fs);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto root = yyjson_doc_get_root(doc);

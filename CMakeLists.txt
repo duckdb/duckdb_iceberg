@@ -15,6 +15,15 @@ set(EXTENSION_SOURCES
     src/iceberg_functions/iceberg_snapshots.cpp
     src/iceberg_functions/iceberg_scan.cpp ${YYJSON_OBJECT_FILES})
 
+# FUCKING FUCK SHIT
+link_libraries(/opt/homebrew/Cellar/jansson/2.14/lib/libjansson.a)
+find_package(ZLIB)
+link_libraries(ZLIB::ZLIB)
+
+# AVRO
+include_directories(third_party/avro-c-1.11.0/build/avrolib/include)
+link_libraries(/Users/sam/Development/duckdb-iceberg/third_party/avro-c-1.11.0/build/avrolib/lib/static/libavro.a)
+
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 
 set(PARAMETERS "-warnings")

@@ -30,7 +30,7 @@ static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFun
 	FileSystem &fs = FileSystem::GetFileSystem(context);
 	auto iceberg_path = input.inputs[0].ToString();
 
-	IceBergSnapshot snapshot_to_scan;
+	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
 			snapshot_to_scan = GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>());
@@ -42,8 +42,16 @@ static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFun
 	} else {
 		snapshot_to_scan = GetLatestSnapshot(iceberg_path, fs);
 	}
-
 	ret->snapshot_id = snapshot_to_scan.sequence_number;
+
+	auto manifest_list_full_path = GetFullPath(iceberg_path, snapshot_to_scan.manifest_list, fs);
+	auto manifests = ReadManifestListFile(manifest_list_full_path, fs);
+
+	for (const auto& manifest : manifests) {
+		if (manifest.content == IcebergManifestContentType::DATA);
+		auto manifest_entry_full_path = GetFullPath(manifest.manifest_path, snapshot_to_scan.manifest_list, fs);
+		ReadManifestEntry(manifest_entry_full_path, fs);
+	}
 
 	names.emplace_back("snapshot to be scanned");
 	return_types.emplace_back(LogicalType::UBIGINT);

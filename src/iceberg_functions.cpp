@@ -1,5 +1,3 @@
-#pragma once
-
 #include "iceberg_functions.hpp"
 
 #include "duckdb/execution/expression_executor.hpp"
