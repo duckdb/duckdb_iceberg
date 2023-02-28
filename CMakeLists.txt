@@ -22,7 +22,9 @@ link_libraries(ZLIB::ZLIB)
 
 # AVRO
 include_directories(third_party/avro-c-1.11.0/build/avrolib/include)
-link_libraries(/Users/sam/Development/duckdb-iceberg/third_party/avro-c-1.11.0/build/avrolib/lib/static/libavro.a)
+link_libraries(
+  /Users/sam/Development/duckdb-iceberg/third_party/avro-c-1.11.0/build/avrolib/lib/static/libavro.a
+)
 
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 

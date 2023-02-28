@@ -32,7 +32,7 @@ enum class IcebergManifestContentType : uint8_t {
 };
 
 static string IcebergManifestContentTypeToString(IcebergManifestContentType type) {
-	switch(type) {
+	switch (type) {
 	case IcebergManifestContentType::DATA:
 		return "DATA";
 	case IcebergManifestContentType::DELETE:
@@ -40,14 +40,10 @@ static string IcebergManifestContentTypeToString(IcebergManifestContentType type
 	}
 }
 
-enum class IcebergManifestEntryStatusType : uint8_t {
-	EXISTING = 0,
-	ADDED = 1,
-	DELETED = 2
-};
+enum class IcebergManifestEntryStatusType : uint8_t { EXISTING = 0, ADDED = 1, DELETED = 2 };
 
 static string IcebergManifestEntryStatusTypeToString(IcebergManifestEntryStatusType type) {
-	switch(type) {
+	switch (type) {
 	case IcebergManifestEntryStatusType::EXISTING:
 		return "EXISTING";
 	case IcebergManifestEntryStatusType::ADDED:
@@ -57,11 +53,7 @@ static string IcebergManifestEntryStatusTypeToString(IcebergManifestEntryStatusT
 	}
 }
 
-enum class IcebergManifestEntryContentType : uint8_t {
-	DATA = 0,
-	POSITION_DELETES = 1,
-	EQUALITY_DELETES = 2
-};
+enum class IcebergManifestEntryContentType : uint8_t { DATA = 0, POSITION_DELETES = 1, EQUALITY_DELETES = 2 };
 
 static string IcebergManifestEntryContentTypeToString(IcebergManifestEntryContentType type) {
 	switch (type) {
@@ -84,7 +76,8 @@ struct IcebergManifest {
 	IcebergManifestContentType content;
 
 	void Print() {
-		Printer::Print("  - Manifest = { content: " + IcebergManifestContentTypeToString(content) + ", path: " + manifest_path + "}" );
+		Printer::Print("  - Manifest = { content: " + IcebergManifestContentTypeToString(content) +
+		               ", path: " + manifest_path + "}");
 	}
 };
 
@@ -99,9 +92,9 @@ struct IcebergManifestEntry {
 	int64_t record_count;
 
 	void Print() {
-		Printer::Print("    -> ManifestEntry = { type: " + IcebergManifestEntryStatusTypeToString(status) + ", content: "
-				       + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path + "." + file_format
-				       + ", record_count: " + to_string(record_count) + "}");
+		Printer::Print("    -> ManifestEntry = { type: " + IcebergManifestEntryStatusTypeToString(status) +
+		               ", content: " + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path + "." +
+		               file_format + ", record_count: " + to_string(record_count) + "}");
 	}
 };
 
@@ -111,7 +104,7 @@ struct IcebergTableEntry {
 
 	void Print() {
 		manifest.Print();
-		for (auto& entry: entries) {
+		for (auto &entry : entries) {
 			entry.Print();
 		}
 	}
@@ -123,7 +116,7 @@ struct IcebergTable {
 
 	void Print() {
 		Printer::Print("Iceberg table (" + path + ")");
-		for (auto& entry : entries) {
+		for (auto &entry : entries) {
 			entry.Print();
 		}
 	}
@@ -140,17 +133,17 @@ static string FileToString(const string &path, FileSystem &fs) {
 
 //! Get the relative path to an iceberg resource
 //! it appears that iceberg contain information on their folder name
-static string GetFullPath(const string& iceberg_path, const string& relative_file_path, FileSystem& fs) {
+static string GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs) {
 	auto res = relative_file_path.find_first_of(fs.PathSeparator());
 	if (res == string::npos) {
 		throw IOException("Invalid iceberg path found: " + relative_file_path);
 	}
 
-	return fs.JoinPath(iceberg_path, relative_file_path.substr(res+1));
+	return fs.JoinPath(iceberg_path, relative_file_path.substr(res + 1));
 }
 
 // ----------------------------------------- AVRO ----------------------------------------------------
-static int AvroReadInt(avro_value_t* val, const char* name, const string& filename) {
+static int AvroReadInt(avro_value_t *val, const char *name, const string &filename) {
 	avro_value_t ret_value;
 	int ret = 0;
 	if (avro_value_get_by_name(val, name, &ret_value, nullptr) == 0) {
@@ -161,7 +154,7 @@ static int AvroReadInt(avro_value_t* val, const char* name, const string& filena
 	return ret;
 }
 
-static int64_t AvroReadLong(avro_value_t* val, const char* name, const string& filename) {
+static int64_t AvroReadLong(avro_value_t *val, const char *name, const string &filename) {
 	avro_value_t ret_value;
 	int64_t ret = 0;
 	if (avro_value_get_by_name(val, name, &ret_value, nullptr) == 0) {
@@ -172,7 +165,7 @@ static int64_t AvroReadLong(avro_value_t* val, const char* name, const string& f
 	return ret;
 }
 
-static string AvroReadString(avro_value_t* val, const char* name, const string& filename) {
+static string AvroReadString(avro_value_t *val, const char *name, const string &filename) {
 	const char *str = nullptr;
 	size_t str_size = 0;
 	avro_value_t str_value;
@@ -181,15 +174,13 @@ static string AvroReadString(avro_value_t* val, const char* name, const string& 
 	} else {
 		throw IOException("Failed to read field '" + string(name) + "' from " + filename);
 	}
-	return {str, str_size-1};
+	return {str, str_size - 1};
 }
 
-static vector<IcebergManifest> ParseManifests(avro_file_reader_t db, avro_schema_t reader_schema, string& filename)
-{
+static vector<IcebergManifest> ParseManifests(avro_file_reader_t db, avro_schema_t reader_schema, string &filename) {
 	vector<IcebergManifest> ret;
 
-	avro_value_iface_t  *manifest_class =
-	    avro_generic_class_from_schema(reader_schema);
+	avro_value_iface_t *manifest_class = avro_generic_class_from_schema(reader_schema);
 	avro_value_t manifest;
 	avro_generic_value_new(manifest_class, &manifest);
 
@@ -205,12 +196,11 @@ static vector<IcebergManifest> ParseManifests(avro_file_reader_t db, avro_schema
 	return ret;
 }
 
-static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, avro_schema_t reader_schema, const string& filename)
-{
+static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, avro_schema_t reader_schema,
+                                                         const string &filename) {
 	vector<IcebergManifestEntry> ret;
 
-	avro_value_iface_t  *manifest_entry_class =
-	    avro_generic_class_from_schema(reader_schema);
+	avro_value_iface_t *manifest_entry_class = avro_generic_class_from_schema(reader_schema);
 
 	avro_value_t manifest;
 	avro_generic_value_new(manifest_entry_class, &manifest);
@@ -223,10 +213,10 @@ static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, 
 			auto path = AvroReadString(&data_file_record_value, "file_path", filename);
 			auto file_format = AvroReadString(&data_file_record_value, "file_path", filename);
 			auto record_count = AvroReadLong(&data_file_record_value, "record_count", filename);
-			ret.push_back(
-				{(IcebergManifestEntryStatusType)status, (IcebergManifestEntryContentType)content, path, file_format, record_count});
+			ret.push_back({(IcebergManifestEntryStatusType)status, (IcebergManifestEntryContentType)content, path,
+			               file_format, record_count});
 		} else {
-			throw IOException("Could not read 'data_file' record from " + filename); //TODO filename
+			throw IOException("Could not read 'data_file' record from " + filename); // TODO filename
 		}
 	}
 	avro_value_decref(&manifest);
@@ -235,7 +225,7 @@ static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, 
 	return ret;
 }
 
-static void OpenAvroFile(string& path, FileSystem &fs, avro_file_reader_t* reader, avro_schema_t* schema) {
+static void OpenAvroFile(string &path, FileSystem &fs, avro_file_reader_t *reader, avro_schema_t *schema) {
 	// TODO: AVRO C API doesn't expose the right functions to read from memory for some reason, use the disk FS for now
 	//       we will need to write our own code to support duckdb's file system here
 	auto res = avro_file_reader(path.c_str(), reader);
@@ -259,15 +249,14 @@ static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem 
 	return ParseManifestEntries(reader, schema, path);
 }
 
-
-static IcebergTable GetIcebergTable (const string& iceberg_path, IcebergSnapshot& snapshot, FileSystem& fs) {
+static IcebergTable GetIcebergTable(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs) {
 	IcebergTable ret;
 	ret.path = iceberg_path;
 
 	auto manifest_list_full_path = GetFullPath(iceberg_path, snapshot.manifest_list, fs);
 	auto manifests = ReadManifestListFile(manifest_list_full_path, fs);
 
-	for (auto& manifest : manifests) {
+	for (auto &manifest : manifests) {
 		auto manifest_entry_full_path = GetFullPath(iceberg_path, manifest.manifest_path, fs);
 		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs);
 
@@ -276,7 +265,6 @@ static IcebergTable GetIcebergTable (const string& iceberg_path, IcebergSnapshot
 
 	return ret;
 }
-
 
 // ---------------------------------------- YYJSON ---------------------------------------------------
 static uint64_t TryGetNumFromObject(yyjson_val *obj, string field) {
