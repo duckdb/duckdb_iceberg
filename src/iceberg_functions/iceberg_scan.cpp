@@ -49,7 +49,7 @@ static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFun
 
 	for (const auto& manifest : manifests) {
 		if (manifest.content == IcebergManifestContentType::DATA);
-		auto manifest_entry_full_path = GetFullPath(manifest.manifest_path, snapshot_to_scan.manifest_list, fs);
+		auto manifest_entry_full_path = GetFullPath(iceberg_path, manifest.manifest_path, fs);
 		ReadManifestEntry(manifest_entry_full_path, fs);
 	}
 

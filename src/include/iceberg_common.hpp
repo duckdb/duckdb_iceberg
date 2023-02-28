@@ -13,7 +13,7 @@
 #include "yyjson.hpp"
 #include <avro.h>
 #include <iostream>
-#include <string.h>
+#include <cstring>
 
 namespace duckdb {
 
@@ -85,50 +85,62 @@ static string GetFullPath(const string& iceberg_path, const string& relative_fil
 }
 
 // ----------------------------------------- AVRO ----------------------------------------------------
-static vector<IcebergManifest> ParseManifests(avro_file_reader_t db, avro_schema_t reader_schema)
+static int AvroReadInt(avro_value_t* val, const char* name, const string& filename) {
+	avro_value_t ret_value;
+	int ret = 0;
+	if (avro_value_get_by_name(val, name, &ret_value, nullptr) == 0) {
+		avro_value_get_int(&ret_value, &ret);
+	} else {
+		throw IOException("Failed to read field '" + string(name) + "' from " + filename);
+	}
+	return ret;
+}
+
+static int64_t AvroReadLong(avro_value_t* val, const char* name, const string& filename) {
+	avro_value_t ret_value;
+	int64_t ret = 0;
+	if (avro_value_get_by_name(val, name, &ret_value, nullptr) == 0) {
+		avro_value_get_long(&ret_value, &ret);
+	} else {
+		throw IOException("Failed to read field '" + string(name) + "' from " + filename);
+	}
+	return ret;
+}
+
+static string AvroReadString(avro_value_t* val, const char* name, const string& filename) {
+	const char *str = nullptr;
+	size_t str_size = 0;
+	avro_value_t str_value;
+	if (avro_value_get_by_name(val, name, &str_value, nullptr) == 0) {
+		avro_value_get_string(&str_value, &str, &str_size);
+	} else {
+		throw IOException("Failed to read field '" + string(name) + "' from " + filename);
+	}
+	return {str, str_size-1};
+}
+
+static vector<IcebergManifest> ParseManifests(avro_file_reader_t db, avro_schema_t reader_schema, string& filename)
 {
 	vector<IcebergManifest> ret;
 
 	avro_value_iface_t  *manifest_class =
 	    avro_generic_class_from_schema(reader_schema);
-
 	avro_value_t manifest;
 	avro_generic_value_new(manifest_class, &manifest);
 
 	while (!avro_file_reader_read_value(db, &manifest)) {
-		const char *path_string = nullptr;
-		size_t path_size = 0;
-		avro_value_t path_value {nullptr, nullptr};
+		auto path = AvroReadString(&manifest, "manifest_path", filename);
+		auto content = AvroReadInt(&manifest, "content", filename);
+		auto sequence_number = AvroReadLong(&manifest, "sequence_number", filename);
 
-		if (avro_value_get_by_name(&manifest, "manifest_path", &path_value, nullptr) == 0) {
-			avro_value_get_string(&path_value, &path_string, &path_size);
-//			std::cout << "Path read: " << string(path_string, path_size-1) << "\n";
-		}
-
-		avro_value_t content_value ;
-		int content = 0;
-		if (avro_value_get_by_name(&manifest, "content", &content_value, nullptr) == 0) {
-			avro_value_get_int(&content_value, &content);
-		}
-
-//		std::cout << "content_value read: " << to_string(content) << "\n";
-
-		avro_value_t sequence_number_value;
-		int64_t sequence_number = 0;
-		if (avro_value_get_by_name(&manifest, "sequence_number", &sequence_number_value, nullptr) == 0) {
-			avro_value_get_long(&sequence_number_value, &sequence_number);
-		}
-//		std::cout << "Sequence number read: " << to_string(sequence_number) << "\n";
-
-		ret.push_back({string(path_string, path_size), sequence_number, (IcebergManifestContentType)content});
+		ret.push_back({path, sequence_number, (IcebergManifestContentType)content});
 	}
 	avro_value_decref(&manifest);
 	avro_value_iface_decref(manifest_class);
-
 	return ret;
 }
 
-static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, avro_schema_t reader_schema)
+static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, avro_schema_t reader_schema, const string& filename)
 {
 	vector<IcebergManifestEntry> ret;
 
@@ -139,16 +151,18 @@ static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, 
 	avro_generic_value_new(manifest_entry_class, &manifest);
 
 	while (!avro_file_reader_read_value(db, &manifest)) {
-		avro_value_t status_value;
-		int status = 0;
-		if (avro_value_get_by_name(&manifest, "status", &status_value, nullptr) == 0) {
-			avro_value_get_int(&status_value, &status);
+		auto status = AvroReadInt(&manifest, "status", filename);
+		avro_value_t data_file_record_value;
+		if (avro_value_get_by_name(&manifest, "data_file", &data_file_record_value, nullptr) == 0) {
+			auto content = AvroReadInt(&data_file_record_value, "content", filename);
+			auto path = AvroReadString(&data_file_record_value, "file_path", filename);
+			auto file_format = AvroReadString(&data_file_record_value, "file_path", filename);
+			auto record_count = AvroReadLong(&data_file_record_value, "record_count", filename);
+			ret.push_back(
+				{(IcebergManifestEntryStatusType)status, (IcebergManifestEntryContentType)content, path, file_format, record_count});
+		} else {
+			throw IOException("Could not read 'data_file' record from " + filename); //TODO filename
 		}
-
-		if (avro_record_get())
-		//		std::cout << "Sequence number read: " << to_string(sequence_number) << "\n";
-
-		ret.push_back({(IcebergManifestEntryStatusType)status, (IcebergManifestEntryContentType)0, "", "", 0});
 	}
 	avro_value_decref(&manifest);
 	avro_value_iface_decref(manifest_entry_class);
@@ -156,36 +170,28 @@ static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, 
 	return ret;
 }
 
-static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs) {
-	// TODO dumb AVRO C API doesn't expose the right functions to read from memory for some reason, use the disk FS for now
-//	auto avro_file = FileToString(path, fs);
-
-	avro_file_reader_t reader;
-
-	auto res = avro_file_reader(path.c_str(), &reader);
+static void OpenAvroFile(string& path, FileSystem &fs, avro_file_reader_t* reader, avro_schema_t* schema) {
+	// TODO: AVRO C API doesn't expose the right functions to read from memory for some reason, use the disk FS for now
+	//       we will need to write our own code to support duckdb's file system here
+	auto res = avro_file_reader(path.c_str(), reader);
 	if (res) {
-		throw IOException("Failed to open avro file " + string(strerror(res)));
+		throw IOException("Failed to open avro file '" + path + "' with error: " + string(strerror(res)));
 	}
+	*schema = avro_file_reader_get_writer_schema(*reader);
+}
 
-	auto read_schema = avro_file_reader_get_writer_schema(reader);
-
-	return ParseManifests(reader, read_schema);
+static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs) {
+	avro_file_reader_t reader;
+	avro_schema_t schema;
+	OpenAvroFile(path, fs, &reader, &schema);
+	return ParseManifests(reader, schema, path);
 }
 
 static vector<IcebergManifestEntry> ReadManifestEntry(string path, FileSystem &fs) {
-	// TODO dumb AVRO C API doesn't expose the right functions to read from memory for some reason, use the disk FS for now
-//	auto avro_file = FileToString(path, fs);
-
 	avro_file_reader_t reader;
-
-	auto res = avro_file_reader(path.c_str(), &reader);
-	if (res) {
-		throw IOException("Failed to open avro file " + string(strerror(res)));
-	}
-
-	auto read_schema = avro_file_reader_get_writer_schema(reader);
-
-	return ParseManifestEntries(reader, read_schema);
+	avro_schema_t schema;
+	OpenAvroFile(path, fs, &reader, &schema);
+	return ParseManifestEntries(reader, schema, path);
 }
 
 
