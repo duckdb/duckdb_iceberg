@@ -28,8 +28,51 @@ struct IcebergSnapshot {
 
 enum class IcebergManifestContentType : uint8_t {
 	DATA = 0,
-	DELETE = 1
+	DELETE = 1,
 };
+
+static string IcebergManifestContentTypeToString(IcebergManifestContentType type) {
+	switch(type) {
+	case IcebergManifestContentType::DATA:
+		return "DATA";
+	case IcebergManifestContentType::DELETE:
+		return "DELETE";
+	}
+}
+
+enum class IcebergManifestEntryStatusType : uint8_t {
+	EXISTING = 0,
+	ADDED = 1,
+	DELETED = 2
+};
+
+static string IcebergManifestEntryStatusTypeToString(IcebergManifestEntryStatusType type) {
+	switch(type) {
+	case IcebergManifestEntryStatusType::EXISTING:
+		return "EXISTING";
+	case IcebergManifestEntryStatusType::ADDED:
+		return "ADDED";
+	case IcebergManifestEntryStatusType::DELETED:
+		return "DELETED";
+	}
+}
+
+enum class IcebergManifestEntryContentType : uint8_t {
+	DATA = 0,
+	POSITION_DELETES = 1,
+	EQUALITY_DELETES = 2
+};
+
+static string IcebergManifestEntryContentTypeToString(IcebergManifestEntryContentType type) {
+	switch (type) {
+	case IcebergManifestEntryContentType::DATA:
+		return "EXISTING";
+	case IcebergManifestEntryContentType::POSITION_DELETES:
+		return "POSITION_DELETES";
+	case IcebergManifestEntryContentType::EQUALITY_DELETES:
+		return "EQUALITY_DELETES";
+	}
+}
 
 //! An entry in the manifest list file (top level AVRO file)
 struct IcebergManifest {
@@ -39,18 +82,10 @@ struct IcebergManifest {
 	int64_t sequence_number;
 	//! either data or deletes
 	IcebergManifestContentType content;
-};
 
-enum class IcebergManifestEntryStatusType : uint8_t {
-	EXISTING = 0,
-	ADDED = 1,
-	DELETED = 2
-};
-
-enum class IcebergManifestEntryContentType : uint8_t {
-	DATA = 0,
-	POSITION_DELETES = 1,
-	EQUALITY_DELETES = 2
+	void Print() {
+		Printer::Print("  - Manifest = { content: " + IcebergManifestContentTypeToString(content) + ", path: " + manifest_path + "}" );
+	}
 };
 
 //! An entry in a manifest file
@@ -62,6 +97,36 @@ struct IcebergManifestEntry {
 	string file_path;
 	string file_format;
 	int64_t record_count;
+
+	void Print() {
+		Printer::Print("    -> ManifestEntry = { type: " + IcebergManifestEntryStatusTypeToString(status) + ", content: "
+				       + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path + "." + file_format
+				       + ", record_count: " + to_string(record_count) + "}");
+	}
+};
+
+struct IcebergTableEntry {
+	IcebergManifest manifest;
+	vector<IcebergManifestEntry> entries;
+
+	void Print() {
+		manifest.Print();
+		for (auto& entry: entries) {
+			entry.Print();
+		}
+	}
+};
+
+struct IcebergTable {
+	string path;
+	vector<IcebergTableEntry> entries;
+
+	void Print() {
+		Printer::Print("Iceberg table (" + path + ")");
+		for (auto& entry : entries) {
+			entry.Print();
+		}
+	}
 };
 
 // ---------------------------------------- MISC ---------------------------------------------------
@@ -187,13 +252,30 @@ static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs)
 	return ParseManifests(reader, schema, path);
 }
 
-static vector<IcebergManifestEntry> ReadManifestEntry(string path, FileSystem &fs) {
+static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs) {
 	avro_file_reader_t reader;
 	avro_schema_t schema;
 	OpenAvroFile(path, fs, &reader, &schema);
 	return ParseManifestEntries(reader, schema, path);
 }
 
+
+static IcebergTable GetIcebergTable (const string& iceberg_path, IcebergSnapshot& snapshot, FileSystem& fs) {
+	IcebergTable ret;
+	ret.path = iceberg_path;
+
+	auto manifest_list_full_path = GetFullPath(iceberg_path, snapshot.manifest_list, fs);
+	auto manifests = ReadManifestListFile(manifest_list_full_path, fs);
+
+	for (auto& manifest : manifests) {
+		auto manifest_entry_full_path = GetFullPath(iceberg_path, manifest.manifest_path, fs);
+		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs);
+
+		ret.entries.push_back({std::move(manifest), std::move(manifest_paths)});
+	}
+
+	return ret;
+}
 
 
 // ---------------------------------------- YYJSON ---------------------------------------------------

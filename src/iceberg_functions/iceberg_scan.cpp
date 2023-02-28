@@ -44,14 +44,7 @@ static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFun
 	}
 	ret->snapshot_id = snapshot_to_scan.sequence_number;
 
-	auto manifest_list_full_path = GetFullPath(iceberg_path, snapshot_to_scan.manifest_list, fs);
-	auto manifests = ReadManifestListFile(manifest_list_full_path, fs);
-
-	for (const auto& manifest : manifests) {
-		if (manifest.content == IcebergManifestContentType::DATA);
-		auto manifest_entry_full_path = GetFullPath(iceberg_path, manifest.manifest_path, fs);
-		ReadManifestEntry(manifest_entry_full_path, fs);
-	}
+	IcebergTable iceberg_table = GetIcebergTable(iceberg_path, snapshot_to_scan, fs);
 
 	names.emplace_back("snapshot to be scanned");
 	return_types.emplace_back(LogicalType::UBIGINT);
