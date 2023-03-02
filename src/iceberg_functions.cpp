@@ -16,4 +16,10 @@ vector<CreateTableFunctionInfo> IcebergFunctions::GetTableFunctions() {
 	return functions;
 }
 
+vector<CreateScalarFunctionInfo> IcebergFunctions::GetScalarFunctions() {
+	vector<CreateScalarFunctionInfo> functions;
+
+	return functions;
+}
+
 } // namespace duckdb

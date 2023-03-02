@@ -17,6 +17,28 @@
 
 namespace duckdb {
 
+// ---------------------------------------- MISC ---------------------------------------------------
+static string FileToString(const string &path, FileSystem &fs) {
+	auto handle = fs.OpenFile(path, FileFlags::FILE_FLAGS_READ);
+	auto file_size = handle->GetFileSize();
+	string ret_val(file_size, ' ');
+	handle->Read((char *)ret_val.c_str(), file_size);
+	return ret_val;
+}
+
+//! Get the relative path to an iceberg resource
+//! it appears that iceberg contain information on their folder name
+static string GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs) {
+	auto res = relative_file_path.find_first_of(fs.PathSeparator());
+	if (res == string::npos) {
+		throw IOException("Invalid iceberg path found: " + relative_file_path);
+	}
+
+	return fs.JoinPath(iceberg_path, relative_file_path.substr(res + 1));
+}
+
+
+// ---------------------------------------- IJSBJORG ---------------------------------------------------
 //! An entry in the metadata.json snapshots field
 struct IcebergSnapshot {
 	uint64_t snapshot_id;
@@ -93,19 +115,18 @@ struct IcebergManifestEntry {
 
 	void Print() {
 		Printer::Print("    -> ManifestEntry = { type: " + IcebergManifestEntryStatusTypeToString(status) +
-		               ", content: " + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path + "." +
-		               file_format + ", record_count: " + to_string(record_count) + "}");
+		               ", content: " + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path + ", record_count: " + to_string(record_count) + "}");
 	}
 };
 
 struct IcebergTableEntry {
 	IcebergManifest manifest;
-	vector<IcebergManifestEntry> entries;
+	vector<IcebergManifestEntry> manifest_entries;
 
 	void Print() {
 		manifest.Print();
-		for (auto &entry : entries) {
-			entry.Print();
+		for (auto &manifest_entry : manifest_entries) {
+			manifest_entry.Print();
 		}
 	}
 };
@@ -114,6 +135,23 @@ struct IcebergTable {
 	string path;
 	vector<IcebergTableEntry> entries;
 
+	template<IcebergManifestContentType TYPE>
+	vector<string> GetPaths() {
+		vector<string> ret;
+		for (auto &entry : entries) {
+			if(entry.manifest.content != TYPE) {
+				continue;
+			}
+			for (auto &manifest_entry : entry.manifest_entries) {
+				if (manifest_entry.status == IcebergManifestEntryStatusType::DELETED) {
+					continue;
+				}
+				ret.push_back(manifest_entry.file_path);
+			}
+		}
+		return ret;
+	}
+
 	void Print() {
 		Printer::Print("Iceberg table (" + path + ")");
 		for (auto &entry : entries) {
@@ -121,26 +159,6 @@ struct IcebergTable {
 		}
 	}
 };
-
-// ---------------------------------------- MISC ---------------------------------------------------
-static string FileToString(const string &path, FileSystem &fs) {
-	auto handle = fs.OpenFile(path, FileFlags::FILE_FLAGS_READ);
-	auto file_size = handle->GetFileSize();
-	string ret_val(file_size, ' ');
-	handle->Read((char *)ret_val.c_str(), file_size);
-	return ret_val;
-}
-
-//! Get the relative path to an iceberg resource
-//! it appears that iceberg contain information on their folder name
-static string GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs) {
-	auto res = relative_file_path.find_first_of(fs.PathSeparator());
-	if (res == string::npos) {
-		throw IOException("Invalid iceberg path found: " + relative_file_path);
-	}
-
-	return fs.JoinPath(iceberg_path, relative_file_path.substr(res + 1));
-}
 
 // ----------------------------------------- AVRO ----------------------------------------------------
 static int AvroReadInt(avro_value_t *val, const char *name, const string &filename) {
@@ -211,7 +229,7 @@ static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, 
 		if (avro_value_get_by_name(&manifest, "data_file", &data_file_record_value, nullptr) == 0) {
 			auto content = AvroReadInt(&data_file_record_value, "content", filename);
 			auto path = AvroReadString(&data_file_record_value, "file_path", filename);
-			auto file_format = AvroReadString(&data_file_record_value, "file_path", filename);
+			auto file_format = AvroReadString(&data_file_record_value, "file_format", filename);
 			auto record_count = AvroReadLong(&data_file_record_value, "record_count", filename);
 			ret.push_back({(IcebergManifestEntryStatusType)status, (IcebergManifestEntryContentType)content, path,
 			               file_format, record_count});

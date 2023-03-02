@@ -6,15 +6,14 @@
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/function/scalar_function.hpp"
+#include "duckdb/catalog/catalog_entry/macro_catalog_entry.hpp"
+#include "duckdb/catalog/default/default_functions.hpp"
 #include "iceberg_functions.hpp"
 #include "yyjson.hpp"
 
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 
 namespace duckdb {
-
-// TODO 2:
-// - hello world with avro
 
 static void LoadInternal(DatabaseInstance &instance) {
 	Connection con(instance);
@@ -26,6 +25,11 @@ static void LoadInternal(DatabaseInstance &instance) {
 	// Iceberg Table Functions
 	for (auto &fun : IcebergFunctions::GetTableFunctions()) {
 		catalog.CreateTableFunction(context, &fun);
+	}
+
+	// Iceberg Scalar Functions
+	for (auto &fun : IcebergFunctions::GetScalarFunctions()) {
+		catalog.CreateFunction(context, &fun);
 	}
 
 	con.Commit();

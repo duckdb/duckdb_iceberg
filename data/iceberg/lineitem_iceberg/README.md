@@ -15,3 +15,6 @@ The result for Q06 of TPC-H on this table according to pyspark is now:
 ```
 [Row(revenue=Decimal('1077536.9101'))]
 ```
+
+Note: it appears that there are no deletes present in this iceberg table, the whole thing was rewritten.
+this is likely due to the fact that the table is so small?
