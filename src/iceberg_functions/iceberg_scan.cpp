@@ -1,6 +1,9 @@
 #include "duckdb/catalog/catalog_entry/table_catalog_entry.hpp"
 #include "duckdb/catalog/catalog_entry/table_function_catalog_entry.hpp"
+#include "duckdb/common/enums/join_type.hpp"
+#include "duckdb/planner/expression/bound_reference_expression.hpp"
 #include "duckdb/planner/operator/logical_get.hpp"
+#include "duckdb/planner/operator/logical_comparison_join.hpp"
 #include "duckdb/common/file_opener.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "iceberg_common.hpp"
@@ -8,9 +11,7 @@
 #include "yyjson.hpp"
 
 #include <string>
-
-// NOTE: currently the scan function is a dummy placeholder that returns the sequence number of the snapshot it should
-// scan
+#include <numeric>
 
 namespace duckdb {
 
@@ -32,30 +33,95 @@ struct IcebergScanBindData : public TableFunctionData {
 	named_parameter_map_t parquet_data_parameter_map;
 	vector<Value> parquet_data_parameters;
 
+	// Bind result from data scan
+	vector<LogicalType> return_types;
+	vector<string> return_names;
+
 	// Delete parquet scan
 	unique_ptr<FunctionData> parquet_deletes_bind_data;
 	named_parameter_map_t parquet_deletes_parameter_map;
 	vector<Value> parquet_deletes_parameters;
 
-	// Bind result from iceberg scan
-	vector<LogicalType> return_types;
-	vector<string> return_names;
+	// Bind result from deletes scan (Can be hardcoded instead?)
+	vector<LogicalType> delete_return_types;
+	vector<string> delete_return_names;
 };
 
-
-
-static unique_ptr<LogicalOperator> IcebergScanBindReplace(ClientContext &context, const FunctionData *bind_data, BindContext& bind_context, idx_t bind_index) {
+static unique_ptr<LogicalOperator> IcebergScanBindReplace(ClientContext &context, const FunctionData *bind_data, BindContext& bind_context, Binder& binder) {
 	auto iceberg_bind_data = (IcebergScanBindData*)bind_data;
-	auto get = make_unique<LogicalGet>(bind_index, iceberg_bind_data->parquet_table_function, std::move(iceberg_bind_data->parquet_data_bind_data), iceberg_bind_data->return_types, iceberg_bind_data->return_names);
-	get->parameters = iceberg_bind_data->parquet_data_parameters;
-	get->named_parameters = iceberg_bind_data->parquet_data_parameter_map;
-	get->input_table_types = {};
-	get->input_table_names = {};
+
+	auto get_data_bind_index = binder.GenerateTableIndex();
+
+	auto get_data = make_unique<LogicalGet>(get_data_bind_index, iceberg_bind_data->parquet_table_function, std::move(iceberg_bind_data->parquet_data_bind_data), iceberg_bind_data->return_types, iceberg_bind_data->return_names);
+	get_data->parameters = iceberg_bind_data->parquet_data_parameters;
+	get_data->named_parameters = iceberg_bind_data->parquet_data_parameter_map;
+	get_data->input_table_types = {};
+	get_data->input_table_names = {};
+
+	// If there's no deletes, we simply return the LogicalGet for the Parquet scan.
+	if (!iceberg_bind_data->parquet_deletes_bind_data) {
+//		Printer::Print("Scanning only data");
+		bind_context.AddTableFunction(get_data_bind_index, "iceberg_scan", iceberg_bind_data->return_names, iceberg_bind_data->return_types, get_data->column_ids, get_data->GetTable());
+		return get_data;
+	} else {
+		bind_context.AddTableFunction(get_data_bind_index, "iceberg_scan_internal_binding_data", iceberg_bind_data->return_names, iceberg_bind_data->return_types, get_data->column_ids, get_data->GetTable());
+	}
+//	Printer::Print("Scanning data with deletes");
+
+	auto get_deletes_bind_index = binder.GenerateTableIndex();
+
+	auto get_deletes = make_unique<LogicalGet>(get_deletes_bind_index, iceberg_bind_data->parquet_table_function, std::move(iceberg_bind_data->parquet_deletes_bind_data), iceberg_bind_data->delete_return_types, iceberg_bind_data->delete_return_names);
+	get_deletes->parameters = iceberg_bind_data->parquet_data_parameters;
+	get_deletes->named_parameters = iceberg_bind_data->parquet_data_parameter_map;
+	get_deletes->column_ids.resize(iceberg_bind_data->delete_return_types.size());
+	std::iota (std::begin(get_deletes->column_ids), std::end(get_deletes->column_ids), 0);
+	get_deletes->input_table_types = {};
+	get_deletes->input_table_names = {};
+	bind_context.AddTableFunction(get_deletes_bind_index, "iceberg_scan_internal_binding_deletes", iceberg_bind_data->delete_return_names, iceberg_bind_data->delete_return_types, get_deletes->column_ids, get_deletes->GetTable());
+
+	// TODO: this is a hacky solution to prevent src/optimizer/remove_unused_columns.cpp from messing with our shit
+	// 		 figure out the nice way to do this
+	get_data->column_ids.resize(iceberg_bind_data->return_types.size());
+	std::iota (std::begin(get_data->column_ids), std::end(get_data->column_ids), 0);
+
+	get_deletes->function.projection_pushdown = false;
+	get_data->function.projection_pushdown = false;
+	get_deletes->function.filter_pushdown = false;
+	get_data->function.filter_pushdown = false;
+	get_deletes->function.pushdown_complex_filter = nullptr;
+	get_data->function.pushdown_complex_filter = nullptr;
+
+	// Construct the ANTI join for filtering out the delete files
+	auto join = make_unique<LogicalComparisonJoin>(JoinType::ANTI);
+	join->children.push_back(std::move(get_data));
+	join->children.push_back(std::move(get_deletes));
+	join->types = iceberg_bind_data->return_types;
+
+	// Construct join conditions for the ANTI join
+	JoinCondition cond1;
+	cond1.comparison = ExpressionType::COMPARE_NOT_DISTINCT_FROM;
+
+	cond1.left = make_unique<BoundColumnRefExpression>("filename", LogicalType::VARCHAR, ColumnBinding(get_data_bind_index,iceberg_bind_data->return_types.size() - 2));
+	cond1.right = make_unique<BoundColumnRefExpression>("filename", LogicalType::VARCHAR, ColumnBinding(get_deletes_bind_index,0));
+//	cond1.left = make_unique<BoundReferenceExpression>("filename", LogicalType::VARCHAR, iceberg_bind_data->return_types.size()+1);
+//	cond1.right = make_unique<BoundReferenceExpression>("filename", LogicalType::VARCHAR, 0);
+
+	JoinCondition cond2;
+	cond2.comparison = ExpressionType::COMPARE_NOT_DISTINCT_FROM;
+	cond2.left = make_unique<BoundColumnRefExpression>("file_row_number", LogicalType::BIGINT, ColumnBinding(get_data_bind_index,iceberg_bind_data->return_types.size() - 1));
+	cond2.right = make_unique<BoundColumnRefExpression>("file_row_number", LogicalType::BIGINT, ColumnBinding(get_deletes_bind_index,1));
+//	cond2.left = make_unique<BoundReferenceExpression>("file_row_number", LogicalType::VARCHAR, iceberg_bind_data->return_types.size()+2);
+//	cond2.right = make_unique<BoundReferenceExpression>("file_row_number", LogicalType::VARCHAR, 1);
+
+	join->conditions.push_back(std::move(cond1));
+	join->conditions.push_back(std::move(cond2));
 
 	// now add the table function to the bind context so its columns can be bound
-	bind_context.AddTableFunction(bind_index, "iceberg_create_view", iceberg_bind_data->return_names, iceberg_bind_data->return_types, get->column_ids, get->GetTable());
 
-	return get;
+	auto join_bind_index = binder.GenerateTableIndex();
+	bind_context.AddGenericBinding(join_bind_index, "iceberg_scan",  iceberg_bind_data->return_names, iceberg_bind_data->return_types);
+
+	return join;
 }
 
 static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFunctionBindInput &input,
@@ -89,7 +155,7 @@ static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFun
 	}
 	vector<Value> delete_file_values;
 	for (auto& delete_file: delete_files) {
-		delete_file_values.push_back({delete_file});
+		delete_file_values.push_back({GetFullPath(iceberg_path, delete_file, fs)});
 	}
 
 	// Lookup parquet scan to get actual binding here
@@ -117,12 +183,10 @@ static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFun
 	if (!delete_file_values.empty()) {
 		vector<Value> parquet_delete_function_inputs = {Value::LIST(delete_file_values)};
 		named_parameter_map_t parquet_delete_named_parameters({});
-		vector<LogicalType> delete_types;
-		vector<string> delete_names;
 		TableFunctionBindInput parquet_delete_bind_input(parquet_delete_function_inputs, parquet_delete_named_parameters, input.input_table_types, input.input_table_names, parquet_table_function.function_info.get());
 		ret->parquet_deletes_parameter_map = parquet_delete_named_parameters;
 		ret->parquet_deletes_parameters = parquet_delete_function_inputs;
-		ret->parquet_deletes_bind_data = parquet_table_function.bind(context, parquet_delete_bind_input, return_types, names);
+		ret->parquet_deletes_bind_data = parquet_table_function.bind(context, parquet_delete_bind_input, ret->delete_return_types, ret->delete_return_names);
 	}
 
 	ret->return_types = return_types;
