@@ -46,16 +46,16 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	names.emplace_back("sequence_number");
 	return_types.emplace_back(LogicalType::UBIGINT);
 
-	names.emplace_back("snapshot-id");
+	names.emplace_back("snapshot_id");
 	return_types.emplace_back(LogicalType::UBIGINT);
 
-	names.emplace_back("timestamp-ms");
+	names.emplace_back("timestamp_ms");
 	return_types.emplace_back(LogicalType::TIMESTAMP);
 
-	names.emplace_back("schema-id");
+	names.emplace_back("schema_id");
 	return_types.emplace_back(LogicalType::UBIGINT);
 
-	names.emplace_back("manifest-list");
+	names.emplace_back("manifest_list");
 	return_types.emplace_back(LogicalType::VARCHAR);
 
 	return ret;

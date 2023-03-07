@@ -1,0 +1,35 @@
+# name: test/sql/iceberg_scan_generated_data_0_01.test
+# description: test iceberg extension with the sf0.01 generated test set
+# group: [iceberg]
+
+require parquet
+
+require iceberg
+
+# Check count matches
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_0_01/pyspark_iceberg_table');
+----
+<FILE>:data/iceberg/generated_0_01/expected_results/q05/count.csv
+
+# Check data is identical, sorting by uuid to guarantee unique order
+query I nosort q1
+SELECT * EXCLUDE (l_commitdate_timestamp, l_commitdate_timestamp_tz) FROM ICEBERG_SCAN('data/iceberg/generated_0_01/pyspark_iceberg_table') ORDER BY uuid NULLS LAST;
+----
+
+query I nosort q1
+SELECT * EXCLUDE (l_commitdate_timestamp, l_commitdate_timestamp_tz) FROM PARQUET_SCAN('data/iceberg/generated_0_01/expected_results/q05/data/*.parquet') ORDER BY uuid NULLS LAST;
+----
+
+# Spark doesnt properly support local timezones, so the parquet files it produces will always have isAdjustedToUTC set to true,
+# and thus be interpreted as timezoned, check out: https://issues.apache.org/jira/browse/SPARK-35662
+# Im not sure but are we handling the impala timestamps correctly? we currently view them as non-timezoned, but i kindof
+# think they should be timezoned? Needs more readin.
+
+#query I nosort q2
+#SELECT l_commitdate_timestamp, l_commitdate_timestamp_tz FROM ICEBERG_SCAN('data/iceberg/generated_0_01/pyspark_iceberg_table') ORDER BY uuid NULLS LAST limit 2;
+#----
+#
+#query I nosort q2
+#SELECT l_commitdate_timestamp, l_commitdate_timestamp_tz FROM PARQUET_SCAN('data/iceberg/generated_0_01/expected_results/q05/data/*.parquet') ORDER BY uuid NULLS LAST limit 2;
+#----

@@ -94,3 +94,9 @@ format:
 
 update:
 	git submodule update --remote --merge
+
+data: data_clean
+	python3 scripts/test_data_generator/generate_iceberg.py 0.01 data/iceberg/generated_0_01
+
+data_clean:
+	rm -rf data/iceberg/generated_*

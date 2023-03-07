@@ -29,12 +29,16 @@ static string FileToString(const string &path, FileSystem &fs) {
 //! Get the relative path to an iceberg resource
 //! it appears that iceberg contain information on their folder name
 static string GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs) {
-	auto res = relative_file_path.find_first_of(fs.PathSeparator());
-	if (res == string::npos) {
-		throw IOException("Invalid iceberg path found: " + relative_file_path);
-	}
 
-	return fs.JoinPath(iceberg_path, relative_file_path.substr(res + 1));
+	// TODO: figure this out, should the path in the metadata alwoys be absolute and correct?
+	return relative_file_path;
+
+//	auto res = relative_file_path.find_first_of(fs.PathSeparator());
+//	if (res == string::npos) {
+//		throw IOException("Invalid iceberg path found: " + relative_file_path);
+//	}
+//
+//	return fs.JoinPath(iceberg_path, relative_file_path.substr(res + 1));
 }
 
 
