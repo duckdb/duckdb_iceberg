@@ -6,7 +6,6 @@ import os
 from pyspark import SparkContext
 from pathlib import Path
 
-
 if (len(sys.argv) != 3):
     print("Usage: generate_iceberg.py <SCALE_FACTOR> <DEST_PATH>")
     exit(1)
@@ -60,6 +59,7 @@ conf.setMaster('local[*]')
 conf.set('spark.sql.catalog.iceberg_catalog', 'org.apache.iceberg.spark.SparkCatalog')
 conf.set('spark.sql.catalog.iceberg_catalog.type', 'hadoop')
 conf.set('spark.sql.catalog.iceberg_catalog.warehouse', DEST_PATH)
+conf.set('spark.sql.parquet.outputTimestampType', 'TIMESTAMP_MICROS')
 conf.set('spark.driver.memory', '10g')
 conf.set('spark.jars', f'{SCRIPT_DIR}/iceberg-spark-runtime-3.3_2.12-1.0.0.jar')
 conf.set('spark.sql.extensions', 'org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions')
@@ -78,11 +78,13 @@ spark.sql(f"CREATE or REPLACE TABLE {TABLE_NAME} TBLPROPERTIES ('format-version'
 ###
 update_files = [str(path) for path in Path(f'{SCRIPT_DIR}').rglob('*.sql')]
 update_files.sort() # Order matters obviously
+last_file = ""
 
 for path in update_files:
     full_file_path = f"{SCRIPT_DIR}/updates/{os.path.basename(path)}"
     with open(full_file_path, 'r') as file:
         file_trimmed = os.path.basename(path)[:-4]
+        last_file = file_trimmed
         print(f"Applying {file_trimmed} to DB")
         query = file.read()
         # Run spark query
@@ -112,4 +114,4 @@ for path in update_files:
 ### Finally, we copy the latest results to a "final" dir for easy test writing
 ###
 import shutil
-shutil.copytree(src, dest)
+shutil.copytree(f"{DEST_PATH}/expected_results/{last_file}", f"{DEST_PATH}/expected_results/last")

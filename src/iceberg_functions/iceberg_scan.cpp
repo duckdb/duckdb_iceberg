@@ -60,7 +60,6 @@ struct IcebergScanBindData : public TableFunctionData {
 
 static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, TableFunctionBindInput &input) {
 	// return a TableRef that contains the scans for the
-
 	auto ret = make_unique<IcebergScanBindData>();
 
 	FileSystem &fs = FileSystem::GetFileSystem(context);
