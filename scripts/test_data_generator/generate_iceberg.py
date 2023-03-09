@@ -18,38 +18,9 @@ CWD = os.getcwd()
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 ###
-### Generate dataset from DuckDB
+### Generate dataset
 ###
-con = duckdb.connect()
-con.query("INSTALL tpch")
-con.query("LOAD tpch")
-con.query(f"SELECT setseed(0.42);")
-con.query(f"CALL dbgen(sf={SCALE});")
-
-# TODO: TIME type
-# ALSO COOL: UUID not supported in spark https://github.com/apache/iceberg/issues/4038, is a STRING now
-con.query("""CREATE VIEW test_table as
-                SELECT
-                (l_orderkey%2=0) as l_orderkey_bool,
-                l_partkey::INT32 as l_partkey_int,
-                l_suppkey::INT64 as l_suppkey_long,
-                l_extendedprice::FLOAT as l_extendedprice_float,
-                l_extendedprice::DOUBLE as l_extendedprice_double,
-                l_shipdate::DATE as l_shipdate_date,
-                l_partkey as l_partkey_time,
-                l_commitdate::TIMESTAMP as l_commitdate_timestamp,
-                l_commitdate::TIMESTAMPTZ as l_commitdate_timestamp_tz,
-                l_comment as l_comment_string,
-                gen_random_uuid()::VARCHAR as uuid,
-                l_comment::BLOB as l_comment_blob,
-                {'a': l_shipmode, 'b': l_quantity} as l_shipmode_quantity_struct,
-                [l_linenumber, l_quantity] as l_linenumber_quantity_list,
-                map(['linenumber', 'quantity'], [l_linenumber, l_quantity]) as l_linenumber_quantity_map
-                FROM
-                lineitem;""");
-
-os.makedirs(os.path.dirname(PARQUET_SRC_FILE), exist_ok=True)
-con.query(f"COPY test_table TO '{PARQUET_SRC_FILE}'");
+os.system(f"python3 {SCRIPT_DIR}/generate_base_parquet.py {SCALE} {CWD}/{DEST_PATH} spark")
 
 ###
 ### Configure everyone's favorite apache product

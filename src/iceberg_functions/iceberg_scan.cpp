@@ -136,7 +136,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	auto select_node = make_unique<SelectNode>();
 	select_node->from_table = std::move(join_node);
 	auto select_expr = make_unique<StarExpression>();
-	select_expr->exclude_list = {"filename", "file_row_number", "file_path", "pos"};
+	select_expr->exclude_list = {"filename", "file_row_number"};
 	vector<unique_ptr<ParsedExpression>> select_exprs;
 	select_exprs.push_back(std::move(select_expr));
 	select_node->select_list = std::move(select_exprs);
