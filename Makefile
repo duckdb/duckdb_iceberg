@@ -97,6 +97,7 @@ update:
 
 data: data_clean
 	python3 scripts/test_data_generator/generate_iceberg.py 0.01 data/iceberg/generated_0_01
+	python3 scripts/test_data_generator/generate_iceberg.py 1 data/iceberg/generated_1
 
 data_clean:
 	rm -rf data/iceberg/generated_*
