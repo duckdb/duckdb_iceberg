@@ -11,9 +11,22 @@
 #include "duckdb.hpp"
 #include "duckdb/common/printer.hpp"
 #include "yyjson.hpp"
-#include <avro.h>
 #include <iostream>
 #include <cstring>
+
+// cpp avro
+#include "avro/Compiler.hh"
+#include "avro/DataFile.hh"
+#include "avro/Decoder.hh"
+#include "avro/Encoder.hh"
+#include "avro/ValidSchema.hh"
+#include "avro/Stream.hh"
+
+// TODO switch these to do full schema reads
+#include "avro_codegen/iceberg_manifest_entry_partial.hpp"
+#include "avro_codegen/iceberg_manifest_file_partial.hpp"
+//#include "avro_codegen/iceberg_manifest_entry_full.hpp"
+//#include "avro_codegen/iceberg_manifest_file_full.hpp"
 
 namespace duckdb {
 
@@ -92,8 +105,22 @@ static string IcebergManifestEntryContentTypeToString(IcebergManifestEntryConten
 	}
 }
 
+static string MANIFEST_SCHEMA = "{\n"
+                                "     \"type\": \"record\",\n"
+                                "     \"name\": \"manifest_file\",\n"
+                                "     \"fields\" : [\n"
+                                "         {\"name\": \"manifest_path\", \"type\": \"string\"},\n"
+                                "         {\"name\": \"content\", \"type\" : \"int\"},\n"
+                                "         {\"name\": \"sequence_number\", \"type\" : \"long\"}\n"
+                                "     ]\n"
+                                " }";
 //! An entry in the manifest list file (top level AVRO file)
 struct IcebergManifest {
+	explicit IcebergManifest(const c::manifest_file& schema) {
+	    manifest_path = schema.manifest_path;
+	    sequence_number = schema.sequence_number;
+	    content = (IcebergManifestContentType)schema.content;
+	}
 	//! Path to the manifest AVRO file
 	string manifest_path;
 	//! sequence_number when manifest was added to table (0 for Iceberg v1)
@@ -107,8 +134,34 @@ struct IcebergManifest {
 	}
 };
 
+static string MANIFEST_ENTRY_SCHEMA = "{\n"
+                                      "     \"type\": \"record\",\n"
+                                      "     \"name\": \"manifest_entry\",\n"
+                                      "     \"fields\" : [\n"
+                                      "         {\"name\": \"status\", \"type\" : \"int\"},\n"
+                                      "         {\"name\": \"data_file\", \"type\": {\n"
+                                      "             \"type\": \"record\",\n"
+                                      "             \"name\": \"r2\",\n"
+                                      "             \"fields\" : [\n"
+                                      "                 {\"name\": \"content\", \"type\": \"int\"},\n"
+                                      "                 {\"name\": \"file_path\", \"type\": \"string\"},\n"
+                                      "                 {\"name\": \"file_format\", \"type\": \"string\"},\n"
+                                      "                 {\"name\": \"record_count\", \"type\" : \"long\"}\n"
+                                      "           ]}\n"
+                                      "         }\n"
+                                      "     ]\n"
+                                      " }";
+
 //! An entry in a manifest file
 struct IcebergManifestEntry {
+	explicit IcebergManifestEntry(const c::manifest_entry& schema) {
+		status = (IcebergManifestEntryStatusType)schema.status;
+		content = (IcebergManifestEntryContentType)schema.data_file.content;
+	  	file_path = schema.data_file.file_path;
+		file_format = schema.data_file.file_format;
+		record_count = schema.data_file.record_count;
+	}
+
 	IcebergManifestEntryStatusType status;
 
 	//! ----- Data File Struct ------
@@ -165,110 +218,39 @@ struct IcebergTable {
 };
 
 // ----------------------------------------- AVRO ----------------------------------------------------
-static int AvroReadInt(avro_value_t *val, const char *name, const string &filename) {
-	avro_value_t ret_value;
-	int ret = 0;
-	if (avro_value_get_by_name(val, name, &ret_value, nullptr) == 0) {
-		avro_value_get_int(&ret_value, &ret);
-	} else {
-		throw IOException("Failed to read field '" + string(name) + "' from " + filename);
-	}
-	return ret;
-}
-
-static int64_t AvroReadLong(avro_value_t *val, const char *name, const string &filename) {
-	avro_value_t ret_value;
-	int64_t ret = 0;
-	if (avro_value_get_by_name(val, name, &ret_value, nullptr) == 0) {
-		avro_value_get_long(&ret_value, &ret);
-	} else {
-		throw IOException("Failed to read field '" + string(name) + "' from " + filename);
-	}
-	return ret;
-}
-
-static string AvroReadString(avro_value_t *val, const char *name, const string &filename) {
-	const char *str = nullptr;
-	size_t str_size = 0;
-	avro_value_t str_value;
-	if (avro_value_get_by_name(val, name, &str_value, nullptr) == 0) {
-		avro_value_get_string(&str_value, &str, &str_size);
-	} else {
-		throw IOException("Failed to read field '" + string(name) + "' from " + filename);
-	}
-	return {str, str_size - 1};
-}
-
-static vector<IcebergManifest> ParseManifests(avro_file_reader_t db, avro_schema_t reader_schema, string &filename) {
-	vector<IcebergManifest> ret;
-
-	avro_value_iface_t *manifest_class = avro_generic_class_from_schema(reader_schema);
-	avro_value_t manifest;
-	avro_generic_value_new(manifest_class, &manifest);
-
-	while (!avro_file_reader_read_value(db, &manifest)) {
-		auto path = AvroReadString(&manifest, "manifest_path", filename);
-		auto content = AvroReadInt(&manifest, "content", filename);
-		auto sequence_number = AvroReadLong(&manifest, "sequence_number", filename);
-
-		ret.push_back({path, sequence_number, (IcebergManifestContentType)content});
-	}
-	avro_value_decref(&manifest);
-	avro_value_iface_decref(manifest_class);
-	return ret;
-}
-
-static vector<IcebergManifestEntry> ParseManifestEntries(avro_file_reader_t db, avro_schema_t reader_schema,
-                                                         const string &filename) {
-	vector<IcebergManifestEntry> ret;
-
-	avro_value_iface_t *manifest_entry_class = avro_generic_class_from_schema(reader_schema);
-
-	avro_value_t manifest;
-	avro_generic_value_new(manifest_entry_class, &manifest);
-
-	while (!avro_file_reader_read_value(db, &manifest)) {
-		auto status = AvroReadInt(&manifest, "status", filename);
-		avro_value_t data_file_record_value;
-		if (avro_value_get_by_name(&manifest, "data_file", &data_file_record_value, nullptr) == 0) {
-			auto content = AvroReadInt(&data_file_record_value, "content", filename);
-			auto path = AvroReadString(&data_file_record_value, "file_path", filename);
-			auto file_format = AvroReadString(&data_file_record_value, "file_format", filename);
-			auto record_count = AvroReadLong(&data_file_record_value, "record_count", filename);
-			ret.push_back({(IcebergManifestEntryStatusType)status, (IcebergManifestEntryContentType)content, path,
-			               file_format, record_count});
-		} else {
-			throw IOException("Could not read 'data_file' record from " + filename); // TODO filename
-		}
-	}
-	avro_value_decref(&manifest);
-	avro_value_iface_decref(manifest_entry_class);
-
-	return ret;
-}
-
-static void OpenAvroFile(string &path, FileSystem &fs, avro_file_reader_t *reader, avro_schema_t *schema) {
-	// TODO: AVRO C API doesn't expose the right functions to read from memory for some reason, use the disk FS for now
-	//       we will need to write our own code to support duckdb's file system here
-	auto res = avro_file_reader(path.c_str(), reader);
-	if (res) {
-		throw IOException("Failed to open avro file '" + path + "' with error: " + string(strerror(res)));
-	}
-	*schema = avro_file_reader_get_writer_schema(*reader);
-}
 
 static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs) {
-	avro_file_reader_t reader;
-	avro_schema_t schema;
-	OpenAvroFile(path, fs, &reader, &schema);
-	return ParseManifests(reader, schema, path);
+	vector<IcebergManifest> ret;
+
+	// TODO: make streaming
+	string file = FileToString(path, fs);
+	auto stream = avro::memoryInputStream((unsigned char*)file.c_str(), file.size());
+	auto schema = avro::compileJsonSchemaFromString(MANIFEST_SCHEMA);
+	avro::DataFileReader<c::manifest_file> dfr(std::move(stream), schema);
+
+	c::manifest_file manifest_list;
+	while (dfr.read(manifest_list)) {
+		ret.emplace_back(IcebergManifest(manifest_list));
+	}
+
+	return ret;
 }
 
 static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs) {
-	avro_file_reader_t reader;
-	avro_schema_t schema;
-	OpenAvroFile(path, fs, &reader, &schema);
-	return ParseManifestEntries(reader, schema, path);
+	vector<IcebergManifestEntry> ret;
+
+	// TODO: make streaming
+	string file = FileToString(path, fs);
+	auto stream = avro::memoryInputStream((unsigned char*)file.c_str(), file.size());
+	auto schema = avro::compileJsonSchemaFromString(MANIFEST_ENTRY_SCHEMA);
+	avro::DataFileReader<c::manifest_entry> dfr(std::move(stream), schema);
+
+	c::manifest_entry manifest_entry;
+	while (dfr.read(manifest_entry)) {
+		ret.emplace_back(IcebergManifestEntry(manifest_entry));
+	}
+
+	return ret;
 }
 
 static IcebergTable GetIcebergTable(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs) {
