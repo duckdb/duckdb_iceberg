@@ -68,18 +68,18 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
-			snapshot_to_scan = GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>());
+			snapshot_to_scan = GetSnapshotById(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<uint64_t>());
 		} else if (input.inputs[1].type() == LogicalType::TIMESTAMP) {
-			snapshot_to_scan = GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>());
+			snapshot_to_scan = GetSnapshotByTimestamp(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<timestamp_t>());
 		} else {
 			throw InvalidInputException("Unknown argument type in IcebergScanBindReplace.");
 		}
 	} else {
-		snapshot_to_scan = GetLatestSnapshot(iceberg_path, fs);
+		snapshot_to_scan = GetLatestSnapshot(iceberg_path, fs, FileOpener::Get(context));
 	}
 	ret->snapshot_id = snapshot_to_scan.sequence_number;
 
-	IcebergTable iceberg_table = GetIcebergTable(iceberg_path, snapshot_to_scan, fs);
+	IcebergTable iceberg_table = GetIcebergTable(iceberg_path, snapshot_to_scan, fs, FileOpener::Get(context));
 	auto data_files = iceberg_table.GetPaths<IcebergManifestContentType::DATA>();
 	auto delete_files = iceberg_table.GetPaths<IcebergManifestContentType::DELETE>();
 

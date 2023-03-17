@@ -1,0 +1,38 @@
+# name: test/sql/iceberg_scan_generated_data_0_01.test
+# description: test iceberg extension with the sf0.01 generated test set
+# group: [iceberg]
+
+require-env S3_TEST_SERVER_AVAILABLE 1
+
+require-env AWS_DEFAULT_REGION
+
+require-env AWS_ACCESS_KEY_ID
+
+require-env AWS_SECRET_ACCESS_KEY
+
+require-env DUCKDB_S3_ENDPOINT
+
+require-env DUCKDB_S3_USE_SSL
+
+set ignore_error_messages
+
+require parquet
+
+require iceberg
+
+require httpfs
+
+# Check count matches
+query I
+SELECT count(*) FROM ICEBERG_SCAN('s3://test-bucket-public/iceberg_0_01/pyspark_iceberg_table');
+----
+<FILE>:data/iceberg/generated_0_01/expected_results/last/count.csv
+
+# Check data is identical, sorting by uuid to guarantee unique order
+query I nosort q1
+SELECT * FROM ICEBERG_SCAN('s3://test-bucket-public/iceberg_0_01/pyspark_iceberg_table') ORDER BY uuid NULLS LAST;
+----
+
+query I nosort q1
+SELECT * FROM PARQUET_SCAN('data/iceberg/generated_0_01/expected_results/last/data/*.parquet') ORDER BY uuid NULLS LAST;
+----

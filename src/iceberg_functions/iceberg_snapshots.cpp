@@ -34,7 +34,7 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	auto filename = input.inputs[0].ToString();
 
 	FileSystem &fs = FileSystem::GetFileSystem(context);
-	ret->metadata_file = ReadMetaData(filename, fs);
+	ret->metadata_file = ReadMetaData(filename, fs, FileOpener::Get(context));
 
 	// Ensure we can read the snapshots property here
 	ret->metadata_doc = yyjson_read(ret->metadata_file.c_str(), ret->metadata_file.size(), 0);

@@ -31,8 +31,9 @@
 namespace duckdb {
 
 // ---------------------------------------- MISC ---------------------------------------------------
-static string FileToString(const string &path, FileSystem &fs) {
-	auto handle = fs.OpenFile(path, FileFlags::FILE_FLAGS_READ);
+static string FileToString(const string &path, FileSystem &fs, FileOpener* opener) {
+	auto handle = fs.OpenFile(path, FileFlags::FILE_FLAGS_READ, FileSystem::DEFAULT_LOCK,
+	                          FileSystem::DEFAULT_COMPRESSION, opener);
 	auto file_size = handle->GetFileSize();
 	string ret_val(file_size, ' ');
 	handle->Read((char *)ret_val.c_str(), file_size);
@@ -219,11 +220,11 @@ struct IcebergTable {
 
 // ----------------------------------------- AVRO ----------------------------------------------------
 
-static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs) {
+static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs, FileOpener* opener) {
 	vector<IcebergManifest> ret;
 
 	// TODO: make streaming
-	string file = FileToString(path, fs);
+	string file = FileToString(path, fs, opener);
 	auto stream = avro::memoryInputStream((unsigned char*)file.c_str(), file.size());
 	auto schema = avro::compileJsonSchemaFromString(MANIFEST_SCHEMA);
 	avro::DataFileReader<c::manifest_file> dfr(std::move(stream), schema);
@@ -236,11 +237,11 @@ static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs)
 	return ret;
 }
 
-static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs) {
+static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs, FileOpener* opener) {
 	vector<IcebergManifestEntry> ret;
 
 	// TODO: make streaming
-	string file = FileToString(path, fs);
+	string file = FileToString(path, fs, opener);
 	auto stream = avro::memoryInputStream((unsigned char*)file.c_str(), file.size());
 	auto schema = avro::compileJsonSchemaFromString(MANIFEST_ENTRY_SCHEMA);
 	avro::DataFileReader<c::manifest_entry> dfr(std::move(stream), schema);
@@ -253,16 +254,16 @@ static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem 
 	return ret;
 }
 
-static IcebergTable GetIcebergTable(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs) {
+static IcebergTable GetIcebergTable(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs, FileOpener* opener) {
 	IcebergTable ret;
 	ret.path = iceberg_path;
 
 	auto manifest_list_full_path = GetFullPath(iceberg_path, snapshot.manifest_list, fs);
-	auto manifests = ReadManifestListFile(manifest_list_full_path, fs);
+	auto manifests = ReadManifestListFile(manifest_list_full_path, fs, opener);
 
 	for (auto &manifest : manifests) {
 		auto manifest_entry_full_path = GetFullPath(iceberg_path, manifest.manifest_path, fs);
-		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs);
+		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs, opener);
 
 		ret.entries.push_back({std::move(manifest), std::move(manifest_paths)});
 	}
@@ -304,10 +305,10 @@ static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot) {
 	return ret;
 }
 
-static idx_t GetTableVersion(string &path, FileSystem &fs) {
+static idx_t GetTableVersion(string &path, FileSystem &fs, FileOpener* opener) {
 	auto meta_path = fs.JoinPath(path, "metadata");
 	auto version_file_path = FileSystem::JoinPath(meta_path, "version-hint.text");
-	auto version_file_content = FileToString(version_file_path, fs);
+	auto version_file_content = FileToString(version_file_path, fs, opener);
 
 	try {
 		return std::stoll(version_file_content);
@@ -374,17 +375,17 @@ static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, time
 	return max_snapshot;
 }
 
-static string ReadMetaData(string &path, FileSystem &fs) {
-	auto table_version = GetTableVersion(path, fs);
+static string ReadMetaData(string &path, FileSystem &fs, FileOpener* opener) {
+	auto table_version = GetTableVersion(path, fs, opener);
 
 	auto meta_path = fs.JoinPath(path, "metadata");
 	auto metadata_file_path = fs.JoinPath(meta_path, "v" + to_string(table_version) + ".metadata.json");
 
-	return FileToString(metadata_file_path, fs);
+	return FileToString(metadata_file_path, fs, opener);
 }
 
-static IcebergSnapshot GetLatestSnapshot(string &path, FileSystem &fs) {
-	auto metadata_json = ReadMetaData(path, fs);
+static IcebergSnapshot GetLatestSnapshot(string &path, FileSystem &fs, FileOpener* opener) {
+	auto metadata_json = ReadMetaData(path, fs, opener);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto root = yyjson_doc_get_root(doc);
 	auto snapshots = yyjson_obj_get(root, "snapshots");
@@ -397,8 +398,8 @@ static IcebergSnapshot GetLatestSnapshot(string &path, FileSystem &fs) {
 	return ParseSnapShot(latest_snapshot);
 }
 
-static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id) {
-	auto metadata_json = ReadMetaData(path, fs);
+static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, FileOpener* opener, idx_t snapshot_id) {
+	auto metadata_json = ReadMetaData(path, fs, opener);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto root = yyjson_doc_get_root(doc);
 	auto snapshots = yyjson_obj_get(root, "snapshots");
@@ -411,8 +412,8 @@ static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snaps
 	return ParseSnapShot(snapshot);
 }
 
-static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp) {
-	auto metadata_json = ReadMetaData(path, fs);
+static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, FileOpener* opener, timestamp_t timestamp) {
+	auto metadata_json = ReadMetaData(path, fs, opener);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto root = yyjson_doc_get_root(doc);
 	auto snapshots = yyjson_obj_get(root, "snapshots");
