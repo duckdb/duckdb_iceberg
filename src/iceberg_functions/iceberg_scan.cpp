@@ -17,7 +17,7 @@
 #include "duckdb/planner/operator/logical_comparison_join.hpp"
 #include "duckdb/common/file_opener.hpp"
 #include "duckdb/common/file_system.hpp"
-#include "iceberg_common.hpp"
+#include "iceberg_metadata.hpp"
 #include "iceberg_functions.hpp"
 #include "yyjson.hpp"
 
@@ -103,28 +103,28 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
-			snapshot_to_scan = GetSnapshotById(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<uint64_t>());
+			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<uint64_t>());
 		} else if (input.inputs[1].type() == LogicalType::TIMESTAMP) {
-			snapshot_to_scan = GetSnapshotByTimestamp(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<timestamp_t>());
+			snapshot_to_scan = IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<timestamp_t>());
 		} else {
 			throw InvalidInputException("Unknown argument type in IcebergScanBindReplace.");
 		}
 	} else {
-		snapshot_to_scan = GetLatestSnapshot(iceberg_path, fs, FileOpener::Get(context));
+		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs, FileOpener::Get(context));
 	}
 	ret->snapshot_id = snapshot_to_scan.sequence_number;
 
-	IcebergTable iceberg_table = GetIcebergTable(iceberg_path, snapshot_to_scan, fs, FileOpener::Get(context), allow_moved_paths);
+	IcebergTable iceberg_table = IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, FileOpener::Get(context), allow_moved_paths);
 	auto data_files = iceberg_table.GetPaths<IcebergManifestContentType::DATA>();
 	auto delete_files = iceberg_table.GetPaths<IcebergManifestContentType::DELETE>();
 
 	vector<Value> data_file_values;
 	for (auto& data_file: data_files) {
-		data_file_values.push_back({allow_moved_paths ? GetFullPath(iceberg_path, data_file, fs) : data_file});
+		data_file_values.push_back({allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, data_file, fs) : data_file});
 	}
 	vector<Value> delete_file_values;
 	for (auto& delete_file: delete_files) {
-		delete_file_values.push_back({allow_moved_paths ? GetFullPath(iceberg_path, delete_file, fs) : delete_file});
+		delete_file_values.push_back({allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, delete_file, fs) : delete_file});
 	}
 
 	// No deletes, just return a TableFunctionRef for a parquet scan of the data files

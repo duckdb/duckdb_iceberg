@@ -10,9 +10,13 @@ include_directories(duckdb/extension/json/yyjson/include)
 include_directories(duckdb/extension/json/include)
 
 set(EXTENSION_SOURCES
-        src/iceberg_extension.cpp src/iceberg_functions.cpp
+        src/iceberg_extension.cpp
+        src/iceberg_functions.cpp
+        src/common/utils.cpp
+        src/common/iceberg.cpp
         src/iceberg_functions/iceberg_snapshots.cpp
-        src/iceberg_functions/iceberg_scan.cpp ${YYJSON_OBJECT_FILES})
+        src/iceberg_functions/iceberg_scan.cpp
+        ${YYJSON_OBJECT_FILES})
 
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 
@@ -49,7 +53,7 @@ target_link_libraries(${EXTENSION_NAME} ${Boost_LIBRARIES})
 target_link_libraries(${TARGET_NAME}_loadable_extension ${Boost_LIBRARIES})
 include_directories(${Boost_INCLUDE_DIRS})
 
-# Snappy: If AVRO build finds snappy, it WILL link it. So we'll do the same here
+# Snappy: If AVRO build finds snappy, it will link it. So we'll do the same here to ensure
 find_package(SNAPPY)
 if (SNAPPY_FOUND)
     target_link_libraries(${EXTENSION_NAME} Snappy::snappy)

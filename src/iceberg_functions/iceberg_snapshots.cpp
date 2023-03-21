@@ -1,6 +1,6 @@
 #include "duckdb/common/file_opener.hpp"
 #include "duckdb/common/file_system.hpp"
-#include "iceberg_common.hpp"
+#include "iceberg_metadata.hpp"
 #include "iceberg_functions.hpp"
 #include "yyjson.hpp"
 
@@ -34,7 +34,7 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	auto filename = input.inputs[0].ToString();
 
 	FileSystem &fs = FileSystem::GetFileSystem(context);
-	ret->metadata_file = ReadMetaData(filename, fs, FileOpener::Get(context));
+	ret->metadata_file = IcebergSnapshot::ReadMetaData(filename, fs, FileOpener::Get(context));
 
 	// Ensure we can read the snapshots property here
 	ret->metadata_doc = yyjson_read(ret->metadata_file.c_str(), ret->metadata_file.size(), 0);
@@ -70,7 +70,7 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 		if (i >= STANDARD_VECTOR_SIZE) {
 			break;
 		}
-		auto snapshot = ParseSnapShot(next_snapshot);
+		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot);
 
 		FlatVector::GetData<int64_t>(output.data[0])[i] = snapshot.sequence_number;
 		FlatVector::GetData<int64_t>(output.data[1])[i] = snapshot.snapshot_id;
