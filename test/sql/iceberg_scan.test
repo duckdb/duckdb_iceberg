@@ -12,27 +12,27 @@ require iceberg
 
 # parquet is required for scanning this parquet-backed iceberg table
 statement error
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg');
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE);
 ----
-Invalid Input Error: Iceberg scan could not find parquet table function, which is required. Try loading parquet with 'LOAD parquet;'
+Catalog Error: Function with name "parquet_scan" is not in the catalog
 
 require parquet
 
 ### Scanning latest snapshot
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg');
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', allow_moved_paths=TRUE);
 ----
 51793
 
 # Scanning 1st snapshot
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', 3776207205136740581::UBIGINT);
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', 3776207205136740581::UBIGINT, ALLOW_MOVED_PATHS=TRUE);
 ----
 60175
 
 # Scanning 2nd snapshot
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', 7635660646343998149::UBIGINT);
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', 7635660646343998149::UBIGINT, ALLOW_MOVED_PATHS=TRUE);
 ----
 51793
 
@@ -41,21 +41,21 @@ SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', 7635660646343
 #   1 = 2023-02-15 15:07:54.504
 #	2 = 2023-02-15 15:08:14.73
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.504'::TIMESTAMP);
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.504'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);
 ----
 60175
 
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.729'::TIMESTAMP);
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.729'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);
 ----
 60175
 
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:08:14.73'::TIMESTAMP);
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:08:14.73'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);
 ----
 51793
 
 statement error
-FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.503'::TIMESTAMP);
+FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.503'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);
 ----
 IO Error: Could not find latest snapshots for timestamp 2023-02-15 15:07:54.503

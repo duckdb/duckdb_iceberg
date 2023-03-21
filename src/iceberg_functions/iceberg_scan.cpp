@@ -58,12 +58,47 @@ struct IcebergScanBindData : public TableFunctionData {
 	vector<string> delete_return_names;
 };
 
+static unique_ptr<ParsedExpression> GetFilenameExpr(unique_ptr<ColumnRefExpression> colref_expr) {
+	vector<unique_ptr<ParsedExpression>> split_children;
+	split_children.push_back(std::move(colref_expr));
+	split_children.push_back(make_unique<ConstantExpression>(Value("/")));
+	auto data_split = make_unique<FunctionExpression>("string_split", std::move(split_children));
+
+	vector<unique_ptr<ParsedExpression>> list_extract_children;
+	list_extract_children.push_back(std::move(data_split));
+	list_extract_children.push_back(make_unique<ConstantExpression>(Value(-1)));
+	auto list_extract_expr = make_unique<FunctionExpression>("list_extract", std::move(list_extract_children));
+
+	return std::move(list_extract_expr);
+}
+
+static unique_ptr<ParsedExpression> GetFilenameMatchExpr() {
+	auto data_colref_expr = make_unique<ColumnRefExpression>("filename", "iceberg_scan_data");
+	auto delete_colref_expr = make_unique<ColumnRefExpression>("file_path", "iceberg_scan_deletes");
+
+	auto data_filename_expr = GetFilenameExpr(std::move(data_colref_expr));
+	auto delete_filename_expr = GetFilenameExpr(std::move(delete_colref_expr));
+
+	return make_unique<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, std::move(data_filename_expr), std::move(delete_filename_expr));
+};
+
 static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, TableFunctionBindInput &input) {
 	// return a TableRef that contains the scans for the
 	auto ret = make_unique<IcebergScanBindData>();
 
 	FileSystem &fs = FileSystem::GetFileSystem(context);
 	auto iceberg_path = input.inputs[0].ToString();
+
+	// Enabling this will ensure the ANTI Join with the deletes only looks at filenames, instead of full paths
+	// this allows hive tables to be moved and have mismatching paths, usefull for testing, but will have worse performance
+	bool allow_moved_paths = false;
+
+	for (auto &kv : input.named_parameters) {
+		auto loption = StringUtil::Lower(kv.first);
+		if (loption == "allow_moved_paths") {
+			allow_moved_paths = BooleanValue::Get(kv.second);
+		}
+	}
 
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
@@ -79,17 +114,17 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	}
 	ret->snapshot_id = snapshot_to_scan.sequence_number;
 
-	IcebergTable iceberg_table = GetIcebergTable(iceberg_path, snapshot_to_scan, fs, FileOpener::Get(context));
+	IcebergTable iceberg_table = GetIcebergTable(iceberg_path, snapshot_to_scan, fs, FileOpener::Get(context), allow_moved_paths);
 	auto data_files = iceberg_table.GetPaths<IcebergManifestContentType::DATA>();
 	auto delete_files = iceberg_table.GetPaths<IcebergManifestContentType::DELETE>();
 
 	vector<Value> data_file_values;
 	for (auto& data_file: data_files) {
-		data_file_values.push_back({GetFullPath(iceberg_path, data_file, fs)});
+		data_file_values.push_back({allow_moved_paths ? GetFullPath(iceberg_path, data_file, fs) : data_file});
 	}
 	vector<Value> delete_file_values;
 	for (auto& delete_file: delete_files) {
-		delete_file_values.push_back({GetFullPath(iceberg_path, delete_file, fs)});
+		delete_file_values.push_back({allow_moved_paths ? GetFullPath(iceberg_path, delete_file, fs) : delete_file});
 	}
 
 	// No deletes, just return a TableFunctionRef for a parquet scan of the data files
@@ -98,17 +133,16 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 		table_function_ref_data->alias = "iceberg_scan_data";
 		vector<unique_ptr<ParsedExpression>> left_children;
 		left_children.push_back(make_unique<ConstantExpression>(Value::LIST(data_file_values)));
-		left_children.push_back(make_unique<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_unique<ColumnRefExpression>("filename"), make_unique<ConstantExpression>(Value(1))));
-		left_children.push_back(make_unique<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_unique<ColumnRefExpression>("file_row_number"), make_unique<ConstantExpression>(Value(1))));
 		table_function_ref_data->function = make_unique<FunctionExpression>("parquet_scan", std::move(left_children));
 		return table_function_ref_data;
 	}
 
 	// Join
 	auto join_node = make_unique<JoinRef>(JoinRefType::REGULAR);
+	auto filename_match_expr = allow_moved_paths ? GetFilenameMatchExpr() : make_unique<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, make_unique<ColumnRefExpression>("filename", "iceberg_scan_data"), make_unique<ColumnRefExpression>("file_path", "iceberg_scan_deletes"));
 	join_node->type = JoinType::ANTI;
 	join_node->condition = make_unique<ConjunctionExpression>(ExpressionType::CONJUNCTION_AND,
-	                                                          make_unique<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, make_unique<ColumnRefExpression>("filename", "iceberg_scan_data"), make_unique<ColumnRefExpression>("file_path", "iceberg_scan_deletes")),
+	                                                          std::move(filename_match_expr),
 	                                                          make_unique<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, make_unique<ColumnRefExpression>("file_row_number", "iceberg_scan_data"), make_unique<ColumnRefExpression>("pos", "iceberg_scan_deletes")));
 
 	// LHS: data
@@ -168,16 +202,19 @@ CreateTableFunctionInfo IcebergFunctions::GetIcebergScanFunction() {
 	auto fun = TableFunction({LogicalType::VARCHAR}, IcebergScanFunction, IcebergScanBind,
 	              IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
+	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	function_set.AddFunction(fun);
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::UBIGINT}, IcebergScanFunction, IcebergScanBind,
 	                         IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
+	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	function_set.AddFunction(fun);
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::TIMESTAMP}, IcebergScanFunction, IcebergScanBind,
 	                         IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
+	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	function_set.AddFunction(fun);
 
 	return CreateTableFunctionInfo(function_set);

@@ -40,19 +40,21 @@ static string FileToString(const string &path, FileSystem &fs, FileOpener* opene
 	return ret_val;
 }
 
-//! Get the relative path to an iceberg resource
-//! it appears that iceberg contain information on their folder name
+//! Somewhat hacky function that allows relative paths in iceberg tables to be resolved,
+//! used for the allow_moved_paths debug option which allows us to test with iceberg tables that
+//! were moved without their paths updated
 static string GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs) {
+	std::size_t found = relative_file_path.find("/metadata/");
+	if (found != string::npos) {
+		return fs.JoinPath(iceberg_path, relative_file_path.substr(found + 1));
+	}
 
-	// TODO: figure this out, should the path in the metadata alwoys be absolute and correct?
-	return relative_file_path;
+	found = relative_file_path.find("/data/");
+	if (found != string::npos) {
+		return fs.JoinPath(iceberg_path, relative_file_path.substr(found + 1));
+	}
 
-//	auto res = relative_file_path.find_first_of(fs.PathSeparator());
-//	if (res == string::npos) {
-//		throw IOException("Invalid iceberg path found: " + relative_file_path);
-//	}
-//
-//	return fs.JoinPath(iceberg_path, relative_file_path.substr(res + 1));
+	throw IOException("Did not recognize iceberg path");
 }
 
 
@@ -254,15 +256,15 @@ static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem 
 	return ret;
 }
 
-static IcebergTable GetIcebergTable(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs, FileOpener* opener) {
+static IcebergTable GetIcebergTable(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs, FileOpener* opener, bool allow_moved_paths = false) {
 	IcebergTable ret;
 	ret.path = iceberg_path;
 
-	auto manifest_list_full_path = GetFullPath(iceberg_path, snapshot.manifest_list, fs);
+	auto manifest_list_full_path = allow_moved_paths ? GetFullPath(iceberg_path, snapshot.manifest_list, fs) : snapshot.manifest_list;
 	auto manifests = ReadManifestListFile(manifest_list_full_path, fs, opener);
 
 	for (auto &manifest : manifests) {
-		auto manifest_entry_full_path = GetFullPath(iceberg_path, manifest.manifest_path, fs);
+		auto manifest_entry_full_path = allow_moved_paths ? GetFullPath(iceberg_path, manifest.manifest_path, fs) : manifest.manifest_path;
 		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs, opener);
 
 		ret.entries.push_back({std::move(manifest), std::move(manifest_paths)});
