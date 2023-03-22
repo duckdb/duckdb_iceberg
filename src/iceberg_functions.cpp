@@ -12,6 +12,7 @@ vector<CreateTableFunctionInfo> IcebergFunctions::GetTableFunctions() {
 
 	functions.push_back(GetIcebergSnapshotsFunction());
 	functions.push_back(GetIcebergScanFunction());
+	functions.push_back(GetIcebergMetadataFunction());
 
 	return functions;
 }

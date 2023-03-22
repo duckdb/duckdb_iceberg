@@ -52,9 +52,6 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	names.emplace_back("timestamp_ms");
 	return_types.emplace_back(LogicalType::TIMESTAMP);
 
-	names.emplace_back("schema_id");
-	return_types.emplace_back(LogicalType::UBIGINT);
-
 	names.emplace_back("manifest_list");
 	return_types.emplace_back(LogicalType::VARCHAR);
 
@@ -75,10 +72,8 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 		FlatVector::GetData<int64_t>(output.data[0])[i] = snapshot.sequence_number;
 		FlatVector::GetData<int64_t>(output.data[1])[i] = snapshot.snapshot_id;
 		FlatVector::GetData<timestamp_t>(output.data[2])[i] = snapshot.timestamp_ms;
-		FlatVector::GetData<int64_t>(output.data[3])[i] = snapshot.schema_id;
-
-		string_t manifest_string_t = StringVector::AddString(output.data[4], string_t(snapshot.manifest_list));
-		FlatVector::GetData<string_t>(output.data[4])[i] = manifest_string_t;
+		string_t manifest_string_t = StringVector::AddString(output.data[3], string_t(snapshot.manifest_list));
+		FlatVector::GetData<string_t>(output.data[3])[i] = manifest_string_t;
 
 		i++;
 	}

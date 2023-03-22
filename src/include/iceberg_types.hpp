@@ -88,6 +88,22 @@ struct IcebergManifest {
 		Printer::Print("  - Manifest = { content: " + IcebergManifestContentTypeToString(content) +
 		               ", path: " + manifest_path + "}");
 	}
+
+	static vector<LogicalType> Types() {
+		return {
+		    LogicalType::VARCHAR,
+		    LogicalType::BIGINT,
+		    LogicalType::VARCHAR,
+		};
+	}
+
+	static vector<string> Names() {
+		return {
+		    "manifest_path",
+		    "manifest_sequence_number",
+		    "manifest_content"
+		};
+	}
 };
 
 //! The schema containing the fields from the manifest entry.
@@ -132,6 +148,27 @@ struct IcebergManifestEntry {
 		Printer::Print("    -> ManifestEntry = { type: " + IcebergManifestEntryStatusTypeToString(status) +
 		               ", content: " + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path + ", record_count: " + to_string(record_count) + "}");
 	}
+
+	static vector<LogicalType> Types() {
+	    return {
+		    LogicalType::VARCHAR,
+		    LogicalType::VARCHAR,
+		    LogicalType::VARCHAR,
+		    LogicalType::VARCHAR,
+		    LogicalType::BIGINT,
+		};
+	}
+
+	static vector<string> Names() {
+	    return {
+		    "status",
+		    "content",
+		    "file_path",
+		    "file_format",
+		    "record_count"
+		};
+	}
+
 };
 
 struct IcebergTableEntry {

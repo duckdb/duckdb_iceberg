@@ -22,6 +22,7 @@ public:
 private:
 	static CreateTableFunctionInfo GetIcebergSnapshotsFunction();
 	static CreateTableFunctionInfo GetIcebergScanFunction();
+	static CreateTableFunctionInfo GetIcebergMetadataFunction();
 };
 
 } // namespace duckdb

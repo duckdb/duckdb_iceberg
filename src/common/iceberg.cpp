@@ -14,6 +14,7 @@ namespace duckdb {
 IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs, FileOpener* opener, bool allow_moved_paths) {
 	IcebergTable ret;
 	ret.path = iceberg_path;
+	ret.snapshot = snapshot;
 
 	auto manifest_list_full_path = allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, snapshot.manifest_list, fs) : snapshot.manifest_list;
 	auto manifests = ReadManifestListFile(manifest_list_full_path, fs, opener);
@@ -124,7 +125,6 @@ IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot) {
 	ret.snapshot_id = IcebergUtils::TryGetNumFromObject(snapshot, "snapshot-id");
 	ret.sequence_number = IcebergUtils::TryGetNumFromObject(snapshot, "sequence-number");
 	ret.timestamp_ms = Timestamp::FromEpochMs(IcebergUtils::TryGetNumFromObject(snapshot, "timestamp-ms"));
-	ret.schema_id = IcebergUtils::TryGetNumFromObject(snapshot, "schema-id");
 	ret.manifest_list = IcebergUtils::TryGetStrFromObject(snapshot, "manifest-list");
 
 	return ret;

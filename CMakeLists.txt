@@ -19,6 +19,7 @@ set(EXTENSION_SOURCES
         src/common/iceberg.cpp
         src/iceberg_functions/iceberg_snapshots.cpp
         src/iceberg_functions/iceberg_scan.cpp
+        src/iceberg_functions/iceberg_metadata.cpp
         ${YYJSON_OBJECT_FILES})
 
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})

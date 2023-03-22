@@ -20,7 +20,6 @@ public:
 	//! Snapshot metadata
 	uint64_t snapshot_id;
 	uint64_t sequence_number;
-	uint64_t schema_id;
 	string manifest_list;
 	timestamp_t timestamp_ms;
 
@@ -70,12 +69,17 @@ public:
 		}
 	}
 
+	//! The snapshot of this table
+	IcebergSnapshot snapshot;
+	//! The entries (manifests) of this table
+	vector<IcebergTableEntry> entries;
+
 protected:
 	static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs, FileOpener* opener);
 	static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs, FileOpener* opener);
 
 	string path;
-	vector<IcebergTableEntry> entries;
+
 };
 
 class IcebergUtils {

@@ -34,7 +34,6 @@
 #  SNAPPY_FOUND              System has Snappy libs/headers
 #  SNAPPY_LIBRARIES          The Snappy libraries
 #  SNAPPY_INCLUDE_DIR        The location of Snappy headers
-message("JEEP")
 find_path(SNAPPY_INCLUDE_DIR
     NAMES snappy.h
     HINTS ${SNAPPY_ROOT_DIR}/include)
