@@ -114,10 +114,10 @@ static string MANIFEST_ENTRY_SCHEMA = "{\n"
 struct IcebergManifestEntry {
 	explicit IcebergManifestEntry(const c::manifest_entry& schema) {
 		status = (IcebergManifestEntryStatusType)schema.status;
-		content = (IcebergManifestEntryContentType)schema.data_file.content;
-		file_path = schema.data_file.file_path;
-		file_format = schema.data_file.file_format;
-		record_count = schema.data_file.record_count;
+		content = (IcebergManifestEntryContentType)schema.data_file_.content;
+		file_path = schema.data_file_.file_path;
+		file_format = schema.data_file_.file_format;
+		record_count = schema.data_file_.record_count;
 	}
 
 	IcebergManifestEntryStatusType status;

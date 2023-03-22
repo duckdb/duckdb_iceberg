@@ -4,6 +4,9 @@ cmake_minimum_required(VERSION 2.8.12)
 set(TARGET_NAME iceberg)
 project(${TARGET_NAME})
 
+# registers our custom findsnappy to match avro's find snappy behaviour
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
+
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 include_directories(src/include)
 include_directories(duckdb/extension/json/yyjson/include)
@@ -33,7 +36,8 @@ ExternalProject_Add(avro_cpp_project
         SOURCE_SUBDIR "lang/c++"
         CMAKE_CACHE_ARGS
         "-DBUILD_SHARED_LIBS:BOOL=OFF"
-        "-DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/avro-cpp-project/install"
+	"-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true"
+	"-DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/avro-cpp-project/install"
         #        "-DCMAKE_OSX_ARCHITECTURES:STRING=${CMAKE_OSX_ARCHITECTURES}"
         BUILD_BYPRODUCTS  "${CMAKE_CURRENT_BINARY_DIR}/avro-cpp-project/install/lib/${CMAKE_STATIC_LIBRARY_PREFIX}avrocpp_s${CMAKE_STATIC_LIBRARY_SUFFIX}"
         )
@@ -54,10 +58,10 @@ target_link_libraries(${TARGET_NAME}_loadable_extension ${Boost_LIBRARIES})
 include_directories(${Boost_INCLUDE_DIRS})
 
 # Snappy: If AVRO build finds snappy, it will link it. So we'll do the same here to ensure
-find_package(SNAPPY)
+find_package(Snappy)
 if (SNAPPY_FOUND)
-    target_link_libraries(${EXTENSION_NAME} Snappy::snappy)
-    target_link_libraries(${TARGET_NAME}_loadable_extension Snappy::snappy)
+    target_link_libraries(${EXTENSION_NAME} ${SNAPPY_LIBRARIES})
+    target_link_libraries(${TARGET_NAME}_loadable_extension ${SNAPPY_LIBRARIES})
 endif()
 
 install(

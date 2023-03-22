@@ -43,10 +43,10 @@ struct data_file {
 
 struct manifest_entry {
    int32_t status;
-   data_file data_file;
+   data_file data_file_; // NOTE: as generated, this is called data_file, but this causes issues with GCC
    manifest_entry() :
 		 status(int32_t()),
-		 data_file()
+		 data_file_()
    { }
 };
 
@@ -94,7 +94,7 @@ template<> struct codec_traits<c::data_file> {
 template<> struct codec_traits<c::manifest_entry> {
    static void encode(Encoder& e, const c::manifest_entry& v) {
 	   avro::encode(e, v.status);
-	   avro::encode(e, v.data_file);
+	   avro::encode(e, v.data_file_);
    }
    static void decode(Decoder& d, c::manifest_entry& v) {
 	   if (avro::ResolvingDecoder *rd =
@@ -107,7 +107,7 @@ template<> struct codec_traits<c::manifest_entry> {
 				   avro::decode(d, v.status);
 				   break;
 			   case 1:
-				   avro::decode(d, v.data_file);
+				   avro::decode(d, v.data_file_);
 				   break;
 			   default:
 				   break;
@@ -115,7 +115,7 @@ template<> struct codec_traits<c::manifest_entry> {
 		   }
 	   } else {
 		   avro::decode(d, v.status);
-		   avro::decode(d, v.data_file);
+		   avro::decode(d, v.data_file_);
 	   }
    }
 };
