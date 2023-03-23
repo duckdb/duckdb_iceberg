@@ -45,6 +45,11 @@ release:
 	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) -DOPENSSL_USE_STATIC_LIBS=1 -DBUILD_HTTPFS_EXTENSION=1 ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S ./duckdb/ -B build/release && \
 	cmake --build build/release --config Release
 
+reldebug:
+	mkdir -p build/release && \
+	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) -DOPENSSL_USE_STATIC_LIBS=1 -DBUILD_HTTPFS_EXTENSION=1 ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo ${BUILD_FLAGS} -S ./duckdb/ -B build/reldebug && \
+	cmake --build build/release --config RelWithDebInfo
+
 # Client build
 debug_js: CLIENT_FLAGS=-DBUILD_NODE=1
 debug_js: debug
