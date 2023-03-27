@@ -73,10 +73,13 @@ release_python: debug
 test: test_release
 
 test_release: release
+	./build/release/test/unittest --test-dir . "*.test"
+
+test_release_all: release
 	./build/release/test/unittest --test-dir . "[sql]"
 
 test_debug: debug
-	./build/debug/test/unittest --test-dir . "[sql]"
+	./build/debug/test/unittest --test-dir . "*.test"
 
 # Client tests
 test_js: test_debug_js
