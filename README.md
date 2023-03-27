@@ -1,20 +1,8 @@
 # DuckDB Iceberg extension
 Extension for DuckDB to read from Apache Iceberg.
 
-# Examples
-```SQL
-> SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', allow_moved_paths=TRUE);
-51793
-```
-
-```SQL
-> SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg');
-1	3776207205136740581	2023-02-15 15:07:54.504	0	lineitem_iceberg/metadata/snap-3776207205136740581-1-cf3d0be5-cf70-453d-ad8f-48fdc412e608.avro
-2	7635660646343998149	2023-02-15 15:08:14.73	0	lineitem_iceberg/metadata/snap-7635660646343998149-1-10eaca8a-1e1c-421e-ad6d-b232e5ee23d3.avro
-```
-
 # Building
-To build the extension, install the dependencies and run
+To build the extension, install the dependencies (see below) and run
 ```shell
 make
 ```
@@ -23,6 +11,22 @@ This will build both the separate loadable extension and a duckdb binary with th
 ./build/release/duckdb
 ./build/release/extension/iceberg/iceberg.duckdb_extension
 ```
+
+# Running iceberg queries
+The easiest way is to start the duckdb binary produced by the build step: `./build/release/duckdb`. Then for example:
+```SQL
+> SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE);
+51793
+```
+Note that for testing, the allow_moved_paths option is available. This option will ensure some path resolution is performed. This
+path resolution allows scanning iceberg tables that are moved, which is useful during testing.
+
+```SQL
+> SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE);
+1	3776207205136740581	2023-02-15 15:07:54.504	0	lineitem_iceberg/metadata/snap-3776207205136740581-1-cf3d0be5-cf70-453d-ad8f-48fdc412e608.avro
+2	7635660646343998149	2023-02-15 15:08:14.73	0	lineitem_iceberg/metadata/snap-7635660646343998149-1-10eaca8a-1e1c-421e-ad6d-b232e5ee23d3.avro
+```
+For more examples check the tests in the `test` directory
 
 # Dependencies
 Currently building the extension requires Boost as the Avro C++ library needs it. Additionally, if the extension was built on a system with Snappy, it also requires
