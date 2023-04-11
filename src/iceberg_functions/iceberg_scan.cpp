@@ -31,32 +31,32 @@ namespace duckdb {
 struct IcebergScanGlobalTableFunctionState : public GlobalTableFunctionState {
 public:
 	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
-		return make_unique<GlobalTableFunctionState>();
+		return make_uniq<GlobalTableFunctionState>();
 	}
 };
 
 static unique_ptr<ParsedExpression> GetFilenameExpr(unique_ptr<ColumnRefExpression> colref_expr) {
 	vector<unique_ptr<ParsedExpression>> split_children;
 	split_children.push_back(std::move(colref_expr));
-	split_children.push_back(make_unique<ConstantExpression>(Value("/")));
-	auto data_split = make_unique<FunctionExpression>("string_split", std::move(split_children));
+	split_children.push_back(make_uniq<ConstantExpression>(Value("/")));
+	auto data_split = make_uniq<FunctionExpression>("string_split", std::move(split_children));
 
 	vector<unique_ptr<ParsedExpression>> list_extract_children;
 	list_extract_children.push_back(std::move(data_split));
-	list_extract_children.push_back(make_unique<ConstantExpression>(Value(-1)));
-	auto list_extract_expr = make_unique<FunctionExpression>("list_extract", std::move(list_extract_children));
+	list_extract_children.push_back(make_uniq<ConstantExpression>(Value(-1)));
+	auto list_extract_expr = make_uniq<FunctionExpression>("list_extract", std::move(list_extract_children));
 
 	return std::move(list_extract_expr);
 }
 
 static unique_ptr<ParsedExpression> GetFilenameMatchExpr() {
-	auto data_colref_expr = make_unique<ColumnRefExpression>("filename", "iceberg_scan_data");
-	auto delete_colref_expr = make_unique<ColumnRefExpression>("file_path", "iceberg_scan_deletes");
+	auto data_colref_expr = make_uniq<ColumnRefExpression>("filename", "iceberg_scan_data");
+	auto delete_colref_expr = make_uniq<ColumnRefExpression>("file_path", "iceberg_scan_deletes");
 
 	auto data_filename_expr = GetFilenameExpr(std::move(data_colref_expr));
 	auto delete_filename_expr = GetFilenameExpr(std::move(delete_colref_expr));
 
-	return make_unique<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, std::move(data_filename_expr), std::move(delete_filename_expr));
+	return make_uniq<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, std::move(data_filename_expr), std::move(delete_filename_expr));
 };
 
 //! Uses recursive unnest on list of structs to return a table with all data and delete files
@@ -78,76 +78,76 @@ static unique_ptr<TableRef> MakeListFilesExpression(vector<Value>& data_file_val
 
 	// Unnest
 	vector<unique_ptr<ParsedExpression>> unnest_children;
-	unnest_children.push_back(make_unique<ConstantExpression>(Value::LIST(structs)));
-	auto recursive_named_param = make_unique<ConstantExpression>(Value::BOOLEAN(true));
+	unnest_children.push_back(make_uniq<ConstantExpression>(Value::LIST(structs)));
+	auto recursive_named_param = make_uniq<ConstantExpression>(Value::BOOLEAN(true));
 	recursive_named_param->alias = "recursive";
 	unnest_children.push_back(std::move(recursive_named_param));
 
 	// Select node
-	auto select_node = make_unique<SelectNode>();
+	auto select_node = make_uniq<SelectNode>();
 	vector<unique_ptr<ParsedExpression>> select_exprs;
-	select_exprs.emplace_back(make_unique<FunctionExpression>("unnest", std::move(unnest_children)));
+	select_exprs.emplace_back(make_uniq<FunctionExpression>("unnest", std::move(unnest_children)));
 	select_node->select_list = std::move(select_exprs);
-	select_node->from_table = make_unique<EmptyTableRef>();
+	select_node->from_table = make_uniq<EmptyTableRef>();
 
 	// Select statement
-	auto select_statement = make_unique<SelectStatement>();
+	auto select_statement = make_uniq<SelectStatement>();
 	select_statement->node = std::move(select_node);
-	return make_unique<SubqueryRef>(std::move(select_statement), "iceberg_scan");
+	return make_uniq<SubqueryRef>(std::move(select_statement), "iceberg_scan");
 }
 
 //! Build the Parquet Scan expression for the files we need to scan
 static unique_ptr<TableRef> MakeScanExpression(vector<Value>& data_file_values, vector<Value>& delete_file_values, bool allow_moved_paths){
 	// No deletes, just return a TableFunctionRef for a parquet scan of the data files
 	if (delete_file_values.empty()) {
-		auto table_function_ref_data = make_unique<TableFunctionRef>();
+		auto table_function_ref_data = make_uniq<TableFunctionRef>();
 		table_function_ref_data->alias = "iceberg_scan_data";
 		vector<unique_ptr<ParsedExpression>> left_children;
-		left_children.push_back(make_unique<ConstantExpression>(Value::LIST(data_file_values)));
-		table_function_ref_data->function = make_unique<FunctionExpression>("parquet_scan", std::move(left_children));
+		left_children.push_back(make_uniq<ConstantExpression>(Value::LIST(data_file_values)));
+		table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
 		return table_function_ref_data;
 	}
 
 	// Join
-	auto join_node = make_unique<JoinRef>(JoinRefType::REGULAR);
-	auto filename_match_expr = allow_moved_paths ? GetFilenameMatchExpr() : make_unique<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, make_unique<ColumnRefExpression>("filename", "iceberg_scan_data"), make_unique<ColumnRefExpression>("file_path", "iceberg_scan_deletes"));
+	auto join_node = make_uniq<JoinRef>(JoinRefType::REGULAR);
+	auto filename_match_expr = allow_moved_paths ? GetFilenameMatchExpr() : make_uniq<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, make_uniq<ColumnRefExpression>("filename", "iceberg_scan_data"), make_uniq<ColumnRefExpression>("file_path", "iceberg_scan_deletes"));
 	join_node->type = JoinType::ANTI;
-	join_node->condition = make_unique<ConjunctionExpression>(ExpressionType::CONJUNCTION_AND,
+	join_node->condition = make_uniq<ConjunctionExpression>(ExpressionType::CONJUNCTION_AND,
 	                                                          std::move(filename_match_expr),
-	                                                          make_unique<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, make_unique<ColumnRefExpression>("file_row_number", "iceberg_scan_data"), make_unique<ColumnRefExpression>("pos", "iceberg_scan_deletes")));
+	                                                          make_uniq<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM, make_uniq<ColumnRefExpression>("file_row_number", "iceberg_scan_data"), make_uniq<ColumnRefExpression>("pos", "iceberg_scan_deletes")));
 
 	// LHS: data
-	auto table_function_ref_data = make_unique<TableFunctionRef>();
+	auto table_function_ref_data = make_uniq<TableFunctionRef>();
 	table_function_ref_data->alias = "iceberg_scan_data";
 	vector<unique_ptr<ParsedExpression>> left_children;
-	left_children.push_back(make_unique<ConstantExpression>(Value::LIST(data_file_values)));
-	left_children.push_back(make_unique<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_unique<ColumnRefExpression>("filename"), make_unique<ConstantExpression>(Value(1))));
-	left_children.push_back(make_unique<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_unique<ColumnRefExpression>("file_row_number"), make_unique<ConstantExpression>(Value(1))));
-	table_function_ref_data->function = make_unique<FunctionExpression>("parquet_scan", std::move(left_children));
+	left_children.push_back(make_uniq<ConstantExpression>(Value::LIST(data_file_values)));
+	left_children.push_back(make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("filename"), make_uniq<ConstantExpression>(Value(1))));
+	left_children.push_back(make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("file_row_number"), make_uniq<ConstantExpression>(Value(1))));
+	table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
 	join_node->left = std::move(table_function_ref_data);
 
 	// RHS: deletes
-	auto table_function_ref_deletes = make_unique<TableFunctionRef>();
+	auto table_function_ref_deletes = make_uniq<TableFunctionRef>();
 	table_function_ref_deletes->alias = "iceberg_scan_deletes";
 	vector<unique_ptr<ParsedExpression>> right_children;
-	right_children.push_back(make_unique<ConstantExpression>(Value::LIST(delete_file_values)));
-	table_function_ref_deletes->function = make_unique<FunctionExpression>("parquet_scan", std::move(right_children));
+	right_children.push_back(make_uniq<ConstantExpression>(Value::LIST(delete_file_values)));
+	table_function_ref_deletes->function = make_uniq<FunctionExpression>("parquet_scan", std::move(right_children));
 	join_node->right = std::move(table_function_ref_deletes);
 
 	// Wrap the join in a select, exclude the filename and file_row_number cols
-	auto select_statement = make_unique<SelectStatement>();
+	auto select_statement = make_uniq<SelectStatement>();
 
 	// Construct Select node
-	auto select_node = make_unique<SelectNode>();
+	auto select_node = make_uniq<SelectNode>();
 	select_node->from_table = std::move(join_node);
-	auto select_expr = make_unique<StarExpression>();
+	auto select_expr = make_uniq<StarExpression>();
 	select_expr->exclude_list = {"filename", "file_row_number"};
 	vector<unique_ptr<ParsedExpression>> select_exprs;
 	select_exprs.push_back(std::move(select_expr));
 	select_node->select_list = std::move(select_exprs);
 	select_statement->node = std::move(select_node);
 
-	return make_unique<SubqueryRef>(std::move(select_statement), "iceberg_scan");
+	return make_uniq<SubqueryRef>(std::move(select_statement), "iceberg_scan");
 }
 
 static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, TableFunctionBindInput &input) {

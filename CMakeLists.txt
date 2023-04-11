@@ -28,6 +28,7 @@ set(PARAMETERS "-warnings")
 build_loadable_extension(${TARGET_NAME} ${PARAMETERS} ${EXTENSION_SOURCES})
 
 ### AVRO
+# TODO: can we not build the avro docs here?
 include(ExternalProject)
 ExternalProject_Add(avro_cpp_project
         GIT_REPOSITORY "https://github.com/apache/avro"

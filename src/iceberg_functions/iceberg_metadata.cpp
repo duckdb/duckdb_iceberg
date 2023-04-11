@@ -41,7 +41,7 @@ public:
 
 	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
 //		auto bind_data = (IcebergMetaDataBindData *)input.bind_data;
-		return make_unique<IcebergMetaDataGlobalTableFunctionState>();
+		return make_uniq<IcebergMetaDataGlobalTableFunctionState>();
 	}
 
 	idx_t current_manifest_idx = 0;
@@ -51,7 +51,7 @@ public:
 static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, TableFunctionBindInput &input,
                                                      vector<LogicalType> &return_types, vector<string> &names) {
 	// return a TableRef that contains the scans for the
-	auto ret = make_unique<IcebergMetaDataBindData>();
+	auto ret = make_uniq<IcebergMetaDataBindData>();
 
 	FileSystem &fs = FileSystem::GetFileSystem(context);
 	auto iceberg_path = input.inputs[0].ToString();
@@ -78,7 +78,7 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs, FileOpener::Get(context));
 	}
 
-	ret->iceberg_table = make_unique<IcebergTable>(IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, FileOpener::Get(context), allow_moved_paths));
+	ret->iceberg_table = make_uniq<IcebergTable>(IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, FileOpener::Get(context), allow_moved_paths));
 
 	auto manifest_types = IcebergManifest::Types();
 	return_types.insert(return_types.end(), manifest_types.begin(), manifest_types.end());

@@ -11,7 +11,7 @@ namespace duckdb {
 struct IcebergSnapshotGlobalTableFunctionState : public GlobalTableFunctionState {
 public:
 	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
-		return make_unique<GlobalTableFunctionState>();
+		return make_uniq<GlobalTableFunctionState>();
 	}
 };
 
@@ -29,7 +29,7 @@ struct IcebergSnaphotsBindData : public TableFunctionData {
 
 static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, TableFunctionBindInput &input,
                                                      vector<LogicalType> &return_types, vector<string> &names) {
-	auto ret = make_unique<IcebergSnaphotsBindData>();
+	auto ret = make_uniq<IcebergSnaphotsBindData>();
 
 	auto filename = input.inputs[0].ToString();
 
