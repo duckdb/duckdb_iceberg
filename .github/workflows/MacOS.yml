@@ -26,8 +26,8 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
-      - name: Install Ninja
-        run: brew install ninja
+      - name: Install Dependencies
+        run: brew install ninja boost snappy
 
       - uses: actions/setup-python@v2
         with:
