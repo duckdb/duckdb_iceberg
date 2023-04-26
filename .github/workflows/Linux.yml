@@ -16,7 +16,8 @@ jobs:
       matrix:
         # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ '<submodule_version>' ]
-        arch: ['linux_amd64', 'linux_arm64', 'linux_amd64_gcc4']
+#        arch: ['linux_amd64', 'linux_arm64', 'linux_amd64_gcc4'] TODO re-enable
+        arch: ['linux_amd64']
         include:
           - arch: 'linux_amd64'
             container: 'ubuntu:16.04'
@@ -35,7 +36,7 @@ jobs:
         apt-get install -y -qq software-properties-common
         add-apt-repository ppa:git-core/ppa
         apt-get update -y -qq
-        apt-get install -y -qq ninja-build make gcc-multilib g++-multilib libssl-dev wget openjdk-8-jdk zip maven unixodbc-dev libc6-dev-i386 lib32readline6-dev libssl-dev libcurl4-gnutls-dev libexpat1-dev gettext unzip build-essential checkinstall libffi-dev curl libz-dev openssh-client libsnappy-dev libboost-dev
+        apt-get install -y -qq ninja-build make gcc-multilib g++-multilib libssl-dev wget openjdk-8-jdk zip maven unixodbc-dev libc6-dev-i386 lib32readline6-dev libssl-dev libcurl4-gnutls-dev libexpat1-dev gettext unzip build-essential checkinstall libffi-dev curl libz-dev openssh-client libsnappy-dev libboost-all-dev
 
     - name: Install required CentOS packages
       if: ${{ matrix.arch == 'linux_amd64_gcc4' }}

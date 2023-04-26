@@ -12,6 +12,9 @@ endif
 ifeq (${STATIC_LIBCPP}, 1)
 	STATIC_LIBCPP=-DSTATIC_LIBCPP=TRUE
 endif
+ifeq (${OSX_BUILD_UNIVERSAL}, 1)
+	OSX_BUILD_UNIVERSAL_FLAG=-DOSX_BUILD_UNIVERSAL=1
+endif
 
 ifeq ($(GEN),ninja)
 	GENERATOR=-G "Ninja"
@@ -42,7 +45,7 @@ debug:
 
 release:
 	mkdir -p build/release && \
-	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) -DOPENSSL_USE_STATIC_LIBS=1 -DBUILD_HTTPFS_EXTENSION=1 ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S ./duckdb/ -B build/release && \
+	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${OSX_BUILD_UNIVERSAL_FLAG} -DOPENSSL_USE_STATIC_LIBS=1 -DBUILD_HTTPFS_EXTENSION=1 ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S ./duckdb/ -B build/release && \
 	cmake --build build/release --config Release
 
 reldebug:
