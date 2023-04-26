@@ -61,16 +61,31 @@ jobs:
     - if: ${{ matrix.arch == 'linux_amd64_gcc4' }}
       uses: ./duckdb/.github/actions/centos_7_setup
       with:
-        openssl: 0
+        openssl: 1
 
     - if: ${{ matrix.arch == 'linux_amd64' || matrix.arch == 'linux_arm64' }}
       uses: ./duckdb/.github/actions/ubuntu_16_setup
       with:
+        openssl: 1
         aarch64_cross_compile: ${{ matrix.arch == 'linux_arm64' && 1 }}
+
+    - name: Configure OpenSSL path for ARM64
+      if: ${{ matrix.arch == 'linux_arm64' }}
+      shell: bash
+      run: |
+        export OPENSSL_ROOT_DIR=`pwd`/build/openssl/build
+        echo "OPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR" >> $GITHUB_ENV
+
+    - name: Configure OpenSSL path for AMD64
+      if: ${{ matrix.arch == 'linux_amd64' || matrix.arch == 'linux_amd64_gcc4'}}
+      shell: bash
+      run: |
+        echo "OPENSSL_ROOT_DIR=/usr/local/ssl" >> $GITHUB_ENV
 
       # Build extension
     - name: Build extension
       env:
+        OPENSSL_ROOT_DIR: ${{ env.OPENSSL_ROOT_DIR }}
         GEN: ninja
         STATIC_LIBCPP: 1
         CC: ${{ matrix.arch == 'linux_arm64' && 'aarch64-linux-gnu-gcc' || '' }}
