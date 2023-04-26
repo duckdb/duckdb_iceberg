@@ -99,16 +99,18 @@ jobs:
       run: |
         make release
 
-    - name: Build extension
-      if: ${{ matrix.arch != 'linux_arm64'}}
-      run: |
-        make test
-
     - uses: actions/upload-artifact@v2
       with:
         name: ${{matrix.arch}}-extensions
         path: |
           build/release/extension/iceberg/iceberg.duckdb_extension
+
+    # Todo: we probably want to first test, then upload later
+    - name: Test extension
+      if: ${{ matrix.arch != 'linux_arm64'}}
+      run: |
+        make data
+        make test
 
     - name: Deploy
       env:

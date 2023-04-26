@@ -41,6 +41,7 @@ jobs:
       - name: Build extension
         run: |
           make release
+          make data
           build/release/test/Release/unittest.exe
 
       - uses: actions/upload-artifact@v2
