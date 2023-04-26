@@ -33,6 +33,11 @@ jobs:
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
 
+      - name: Install OpenSSL
+        shell: bash
+        run: |
+          choco install openssl -y --force
+
       - name: Build extension
         run: |
           make release
