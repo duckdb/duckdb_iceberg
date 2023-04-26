@@ -72,8 +72,22 @@ jobs:
     - if: ${{ matrix.arch == 'linux_amd64' || matrix.arch == 'linux_arm64' }}
       uses: ./duckdb/.github/actions/ubuntu_16_setup
       with:
-        openssl: 1
+        openssl: 0
         aarch64_cross_compile: ${{ matrix.arch == 'linux_arm64' && 1 }}
+
+    # Openssl install dir was weirdly configured in main duckdb?
+    - name: Install OpenSSL 1.1.1
+      if: ${{ matrix.arch == 'linux_amd64' || matrix.arch == 'linux_arm64'}}
+      shell: bash
+      run: |
+        wget https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_1_1_1s.tar.gz
+        tar -xzvf OpenSSL_1_1_1s.tar.gz
+        mv openssl-OpenSSL_1_1_1s openssl-1.1.1s
+        cd openssl-1.1.1s
+        find ./ -type f -exec sed -i -e 's/\#\ define\ OPENSSL\_VERSION\_NUMBER/\#define\ OPENSSL\_VERSION\_NUMBER/g' {} \;
+        ./config -libdir=lib no-shared zlib-dynamic
+        make
+        make install
 
     - name: Configure OpenSSL path for ARM64
       if: ${{ matrix.arch == 'linux_arm64' }}
