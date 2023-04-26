@@ -46,6 +46,12 @@ jobs:
           make release
           make test
 
+      - uses: actions/upload-artifact@v2
+        with:
+          name: osx-extensions
+          path: |
+            build/release/extension/iceberg/iceberg.duckdb_extension
+
       - name: Deploy
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_DEPLOY_ID }}

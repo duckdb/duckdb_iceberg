@@ -40,7 +40,7 @@ jobs:
 
       - uses: actions/upload-artifact@v2
         with:
-          name: linux-extensions-64-aarch64
+          name: windows-extension
           path: |
             build/release/extension/iceberg/iceberg.duckdb_extension
 
