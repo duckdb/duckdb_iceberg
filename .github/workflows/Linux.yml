@@ -118,7 +118,7 @@ jobs:
       with:
         name: ${{matrix.arch}}-extensions
         path: |
-          build/release/extension/iceberg/iceberg.duckdb_extension
+          build/release/extension/*/*.duckdb_extension
 
     - name: Test extension
       if: ${{ matrix.arch != 'linux_arm64'}}
