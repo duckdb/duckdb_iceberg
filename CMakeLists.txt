@@ -56,6 +56,8 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/avro-cpp-project/src/avro_cpp_pr
 # Boost
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS system iostreams)
+target_link_directories(${EXTENSION_NAME} PUBLIC ${Boost_LIBRARY_DIRS})
+target_link_directories(${TARGET_NAME}_loadable_extension PUBLIC ${Boost_LIBRARY_DIRS})
 target_link_libraries(${EXTENSION_NAME} ${Boost_LIBRARIES})
 target_link_libraries(${TARGET_NAME}_loadable_extension ${Boost_LIBRARIES})
 include_directories(${Boost_INCLUDE_DIRS})
