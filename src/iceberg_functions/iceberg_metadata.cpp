@@ -40,7 +40,6 @@ public:
 	};
 
 	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
-//		auto bind_data = (IcebergMetaDataBindData *)input.bind_data;
 		return make_uniq<IcebergMetaDataGlobalTableFunctionState>();
 	}
 
@@ -68,17 +67,17 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
-			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<uint64_t>());
+			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>());
 		} else if (input.inputs[1].type() == LogicalType::TIMESTAMP) {
-			snapshot_to_scan = IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<timestamp_t>());
+			snapshot_to_scan = IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>());
 		} else {
 			throw InvalidInputException("Unknown argument type in IcebergScanBindReplace.");
 		}
 	} else {
-		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs, FileOpener::Get(context));
+		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs);
 	}
 
-	ret->iceberg_table = make_uniq<IcebergTable>(IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, FileOpener::Get(context), allow_moved_paths));
+	ret->iceberg_table = make_uniq<IcebergTable>(IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths));
 
 	auto manifest_types = IcebergManifest::Types();
 	return_types.insert(return_types.end(), manifest_types.begin(), manifest_types.end());
@@ -99,21 +98,20 @@ static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFun
 }
 
 static void IcebergMetaDataFunction(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
-	auto bind_data = (IcebergMetaDataBindData *)data.bind_data;
-	auto global_state = (IcebergMetaDataGlobalTableFunctionState *)data.global_state;
+	auto& bind_data = data.bind_data->Cast<IcebergMetaDataBindData>();
+	auto& global_state = data.global_state->Cast<IcebergMetaDataGlobalTableFunctionState>();
 
 	idx_t out = 0;
-
-	auto manifests = bind_data->iceberg_table->entries;
-	for (; global_state->current_manifest_idx < manifests.size(); global_state->current_manifest_idx++) {
-		auto manifest_entries = manifests[global_state->current_manifest_idx].manifest_entries;
-		for (; global_state->current_manifest_entry_idx < manifest_entries.size();  global_state->current_manifest_entry_idx++) {
+	auto manifests = bind_data.iceberg_table->entries;
+	for (; global_state.current_manifest_idx < manifests.size(); global_state.current_manifest_idx++) {
+		auto manifest_entries = manifests[global_state.current_manifest_idx].manifest_entries;
+		for (; global_state.current_manifest_entry_idx < manifest_entries.size();  global_state.current_manifest_entry_idx++) {
 			if (out >= STANDARD_VECTOR_SIZE) {
 				output.SetCardinality(out);
 				return;
 			}
-			auto manifest = manifests[global_state->current_manifest_idx];
-			auto manifest_entry = manifest_entries[global_state->current_manifest_entry_idx];
+			auto manifest = manifests[global_state.current_manifest_idx];
+			auto manifest_entry = manifest_entries[global_state.current_manifest_entry_idx];
 
 			FlatVector::GetData<string_t>(output.data[0])[out] = StringVector::AddString(output.data[0], string_t(manifest.manifest.manifest_path));;
 			FlatVector::GetData<int64_t>(output.data[1])[out] = manifest.manifest.sequence_number;
@@ -126,12 +124,12 @@ static void IcebergMetaDataFunction(ClientContext &context, TableFunctionInput &
 			FlatVector::GetData<int64_t>(output.data[7])[out] = manifest_entry.record_count;
 			out++;
 		}
-		global_state->current_manifest_entry_idx = 0;
+		global_state.current_manifest_entry_idx = 0;
 	}
 	output.SetCardinality(out);
 }
 
-CreateTableFunctionInfo IcebergFunctions::GetIcebergMetadataFunction() {
+TableFunctionSet IcebergFunctions::GetIcebergMetadataFunction() {
 	TableFunctionSet function_set("iceberg_metadata");
 
 	auto fun = TableFunction({LogicalType::VARCHAR}, IcebergMetaDataFunction, IcebergMetaDataBind,
@@ -149,7 +147,7 @@ CreateTableFunctionInfo IcebergFunctions::GetIcebergMetadataFunction() {
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	function_set.AddFunction(fun);
 
-	return CreateTableFunctionInfo(function_set);
+	return function_set;
 }
 
 } // namespace duckdb

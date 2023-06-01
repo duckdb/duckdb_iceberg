@@ -10,7 +10,7 @@
 #include "duckdb/catalog/default/default_functions.hpp"
 #include "iceberg_functions.hpp"
 #include "yyjson.hpp"
-
+#include "duckdb/main/extension_util.hpp"
 #include <duckdb/parser/parsed_data/create_scalar_function_info.hpp>
 
 namespace duckdb {
@@ -24,12 +24,12 @@ static void LoadInternal(DatabaseInstance &instance) {
 
 	// Iceberg Table Functions
 	for (auto &fun : IcebergFunctions::GetTableFunctions()) {
-		catalog.CreateTableFunction(context, &fun);
+		ExtensionUtil::RegisterFunction(instance, fun);
 	}
 
 	// Iceberg Scalar Functions
 	for (auto &fun : IcebergFunctions::GetScalarFunctions()) {
-		catalog.CreateFunction(context, &fun);
+		ExtensionUtil::RegisterFunction(instance, fun);
 	}
 
 	con.Commit();

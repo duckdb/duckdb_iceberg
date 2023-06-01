@@ -7,8 +7,8 @@
 
 namespace duckdb {
 
-vector<CreateTableFunctionInfo> IcebergFunctions::GetTableFunctions() {
-	vector<CreateTableFunctionInfo> functions;
+vector<TableFunctionSet> IcebergFunctions::GetTableFunctions() {
+	vector<TableFunctionSet> functions;
 
 	functions.push_back(GetIcebergSnapshotsFunction());
 	functions.push_back(GetIcebergScanFunction());
@@ -17,8 +17,8 @@ vector<CreateTableFunctionInfo> IcebergFunctions::GetTableFunctions() {
 	return functions;
 }
 
-vector<CreateScalarFunctionInfo> IcebergFunctions::GetScalarFunctions() {
-	vector<CreateScalarFunctionInfo> functions;
+vector<ScalarFunction> IcebergFunctions::GetScalarFunctions() {
+	vector<ScalarFunction> functions;
 
 	return functions;
 }

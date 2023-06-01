@@ -24,16 +24,16 @@ public:
 	string manifest_list;
 	timestamp_t timestamp_ms;
 
-	static IcebergSnapshot GetLatestSnapshot(string &path, FileSystem &fs, FileOpener* opener);
-	static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, FileOpener* opener, idx_t snapshot_id);
-	static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, FileOpener* opener, timestamp_t timestamp);
+	static IcebergSnapshot GetLatestSnapshot(string &path, FileSystem &fs);
+	static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id);
+	static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp);
 
 	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot);
-	static string ReadMetaData(string &path, FileSystem &fs, FileOpener* opener);
+	static string ReadMetaData(string &path, FileSystem &fs);
 
 protected:
 	//! Internal JSON parsing functions
-	static idx_t GetTableVersion(string &path, FileSystem &fs, FileOpener* opener);
+	static idx_t GetTableVersion(string &path, FileSystem &fs);
 	static yyjson_val *FindLatestSnapshotInternal(yyjson_val *snapshots);
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);
@@ -43,7 +43,7 @@ protected:
 struct IcebergTable {
 public:
 	//! Loads all(!) metadata of into IcebergTable object
-	static IcebergTable Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs, FileOpener* opener, bool allow_moved_paths = false);
+	static IcebergTable Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs, bool allow_moved_paths = false);
 
 	//! Returns all paths to be scanned for the IcebergManifestContentType
 	template<IcebergManifestContentType TYPE>
@@ -71,8 +71,8 @@ public:
 	}
 
 protected:
-	static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs, FileOpener* opener);
-	static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs, FileOpener* opener);
+	static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs);
+	static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs);
 
 	string path;
 	vector<IcebergTableEntry> entries;
@@ -81,7 +81,7 @@ protected:
 class IcebergUtils {
 public:
 	//! Downloads a file fully into a string
-	static string FileToString(const string &path, FileSystem &fs, FileOpener* opener);
+	static string FileToString(const string &path, FileSystem &fs);
 
 	//! Somewhat hacky function that allows relative paths in iceberg tables to be resolved,
 	//! used for the allow_moved_paths debug option which allows us to test with iceberg tables that

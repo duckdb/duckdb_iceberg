@@ -171,17 +171,17 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
-			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<uint64_t>());
+			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>());
 		} else if (input.inputs[1].type() == LogicalType::TIMESTAMP) {
-			snapshot_to_scan = IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, FileOpener::Get(context), input.inputs[1].GetValue<timestamp_t>());
+			snapshot_to_scan = IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>());
 		} else {
 			throw InvalidInputException("Unknown argument type in IcebergScanBindReplace.");
 		}
 	} else {
-		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs, FileOpener::Get(context));
+		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs);
 	}
 
-	IcebergTable iceberg_table = IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, FileOpener::Get(context), allow_moved_paths);
+	IcebergTable iceberg_table = IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths);
 	auto data_files = iceberg_table.GetPaths<IcebergManifestContentType::DATA>();
 	auto delete_files = iceberg_table.GetPaths<IcebergManifestContentType::DELETE>();
 	vector<Value> data_file_values;
@@ -208,7 +208,7 @@ static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFun
 }
 
 
-CreateTableFunctionInfo IcebergFunctions::GetIcebergScanFunction() {
+TableFunctionSet IcebergFunctions::GetIcebergScanFunction() {
 	TableFunctionSet function_set("iceberg_scan");
 
 	auto fun = TableFunction({LogicalType::VARCHAR}, nullptr, IcebergScanBind,
@@ -232,7 +232,7 @@ CreateTableFunctionInfo IcebergFunctions::GetIcebergScanFunction() {
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
 	function_set.AddFunction(fun);
 
-	return CreateTableFunctionInfo(function_set);
+	return function_set;
 }
 
 } // namespace duckdb

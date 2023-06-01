@@ -3,9 +3,9 @@
 
 namespace duckdb {
 
-string IcebergUtils::FileToString(const string &path, FileSystem &fs, FileOpener* opener) {
+string IcebergUtils::FileToString(const string &path, FileSystem &fs) {
 	auto handle = fs.OpenFile(path, FileFlags::FILE_FLAGS_READ, FileSystem::DEFAULT_LOCK,
-	                          FileSystem::DEFAULT_COMPRESSION, opener);
+	                          FileSystem::DEFAULT_COMPRESSION);
 	auto file_size = handle->GetFileSize();
 	string ret_val(file_size, ' ');
 	handle->Read((char *)ret_val.c_str(), file_size);

@@ -8,20 +8,31 @@
 
 namespace duckdb {
 
-struct IcebergSnapshotGlobalTableFunctionState : public GlobalTableFunctionState {
-public:
-	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
-		return make_uniq<GlobalTableFunctionState>();
-	}
+struct IcebergSnaphotsBindData : public TableFunctionData {
+	IcebergSnaphotsBindData() {};
+	string filename;
 };
 
-struct IcebergSnaphotsBindData : public TableFunctionData {
-	IcebergSnaphotsBindData() : metadata_doc(nullptr) {};
-	~IcebergSnaphotsBindData() {
+struct IcebergSnapshotGlobalTableFunctionState : public GlobalTableFunctionState {
+public:
+	~IcebergSnapshotGlobalTableFunctionState() {
 		if (metadata_doc) {
 			yyjson_doc_free(metadata_doc);
 		}
 	}
+	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
+		auto bind_data = input.bind_data->Cast<IcebergSnaphotsBindData>();
+		auto global_state = make_uniq<IcebergSnapshotGlobalTableFunctionState>();
+
+		FileSystem &fs = FileSystem::GetFileSystem(context);
+		global_state->metadata_file = IcebergSnapshot::ReadMetaData(bind_data.filename, fs);
+		global_state->metadata_doc = yyjson_read(global_state->metadata_file.c_str(), global_state->metadata_file.size(), 0);
+		auto root = yyjson_doc_get_root(global_state->metadata_doc);
+		auto snapshots = yyjson_obj_get(root, "snapshots");
+		yyjson_arr_iter_init(snapshots, &global_state->snapshot_it);
+		return global_state;
+	}
+
 	string metadata_file;
 	yyjson_doc *metadata_doc;
 	yyjson_arr_iter snapshot_it;
@@ -29,19 +40,9 @@ struct IcebergSnaphotsBindData : public TableFunctionData {
 
 static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, TableFunctionBindInput &input,
                                                      vector<LogicalType> &return_types, vector<string> &names) {
-	auto ret = make_uniq<IcebergSnaphotsBindData>();
+	auto bind_data = make_uniq<IcebergSnaphotsBindData>();
 
-	auto filename = input.inputs[0].ToString();
-
-	FileSystem &fs = FileSystem::GetFileSystem(context);
-	ret->metadata_file = IcebergSnapshot::ReadMetaData(filename, fs, FileOpener::Get(context));
-
-	// Ensure we can read the snapshots property here
-	ret->metadata_doc = yyjson_read(ret->metadata_file.c_str(), ret->metadata_file.size(), 0);
-
-	auto root = yyjson_doc_get_root(ret->metadata_doc);
-	auto snapshots = yyjson_obj_get(root, "snapshots");
-	yyjson_arr_iter_init(snapshots, &ret->snapshot_it);
+	bind_data->filename = input.inputs[0].ToString();
 
 	names.emplace_back("sequence_number");
 	return_types.emplace_back(LogicalType::UBIGINT);
@@ -55,15 +56,15 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	names.emplace_back("manifest_list");
 	return_types.emplace_back(LogicalType::VARCHAR);
 
-	return ret;
+	return bind_data;
 }
 
 // Snapshots function
 static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
-	auto bind_data = (IcebergSnaphotsBindData *)data.bind_data;
+	auto& global_state = data.global_state->Cast<IcebergSnapshotGlobalTableFunctionState>();
 
 	idx_t i = 0;
-	while (auto next_snapshot = yyjson_arr_iter_next(&bind_data->snapshot_it)) {
+	while (auto next_snapshot = yyjson_arr_iter_next(&global_state.snapshot_it)) {
 		if (i >= STANDARD_VECTOR_SIZE) {
 			break;
 		}
@@ -80,13 +81,12 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 	output.SetCardinality(i);
 }
 
-CreateTableFunctionInfo IcebergFunctions::GetIcebergSnapshotsFunction() {
-	auto function_info = make_shared<TableFunctionInfo>();
-	TableFunction table_function("iceberg_snapshots", {LogicalType::VARCHAR}, IcebergSnapshotsFunction,
+TableFunctionSet IcebergFunctions::GetIcebergSnapshotsFunction() {
+	TableFunctionSet function_set("iceberg_snapshots");
+	TableFunction table_function( {LogicalType::VARCHAR}, IcebergSnapshotsFunction,
 	                             IcebergSnapshotsBind, IcebergSnapshotGlobalTableFunctionState::Init);
-	table_function.function_info = std::move(function_info);
-
-	return CreateTableFunctionInfo(table_function);
+	function_set.AddFunction(table_function);
+	return function_set;
 }
 
 } // namespace duckdb
