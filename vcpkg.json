@@ -6,6 +6,7 @@
     "boost-system",
     "boost-format",
     "snappy",
-    "zlib"
+    "zlib",
+    "openssl"
   ]
 }
