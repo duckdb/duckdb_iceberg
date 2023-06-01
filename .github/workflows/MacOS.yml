@@ -98,7 +98,7 @@ jobs:
       - name: Build extension
         shell: bash
         run: |
-          make test_release_ci
+          make release
 
       - uses: actions/upload-artifact@v2
         with:
@@ -111,7 +111,7 @@ jobs:
         if: ${{ matrix.osx_build_arch == 'x86_64'}}
         shell: bash
         run: |
-          make test
+          make test_release_ci
 
       - name: Deploy
         env:
