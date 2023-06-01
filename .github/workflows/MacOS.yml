@@ -9,16 +9,31 @@ defaults:
 
 jobs:
   macos:
-    name: MacOS Release (Universal)
+    name: MacOS Release (${{ matrix.osx_build_arch }})
     runs-on: macos-latest
     strategy:
       matrix:
         # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ '<submodule_version>' ]
+        vcpkg_version: [ '2023.04.15' ]
+        vcpkg_triplet: [ 'x64-osx', 'arm64-osx' ]
+        include:
+          - vcpkg_triplet: 'x64-osx'
+            osx_build_arch: 'x86_64'
+            duckdb_arch: 'osx_amd64'
+          - vcpkg_triplet: 'arm64-osx'
+            osx_build_arch: 'arm64'
+            duckdb_arch: 'osx_arm64'
 
     env:
-      OSX_BUILD_UNIVERSAL: 1
-      GEN: ninja
+      VCPKG_TARGET_TRIPLET: ${{ matrix.vcpkg_triplet }}
+      OSX_BUILD_ARCH: ${{ matrix.osx_build_arch }}
+      GEN: Ninja
+      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg/bincache
+      # Let's use GitHub Action cache as storage for the vcpkg Binary Caching feature.
+      VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
+      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
     steps:
       - uses: actions/checkout@v3
@@ -26,12 +41,35 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
-      - name: Install Dependencies
-        run: brew install ninja boost snappy
+      - name: Install Ninja
+        run: brew install ninja
+
+      # Set env vars needed for vcpkg to leverage the GitHub Action cache as a storage
+      # for Binary Caching.
+      - uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Setup Ccache
+        uses: hendrikmuhs/ccache-action@main
+        with:
+          key: ${{ github.job }}-${{ matrix.duckdb_version }}
+          save: ${{ github.ref == 'refs/heads/master' || github.repository != 'duckdb/duckdb' }}
+
+      - name: setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg && git checkout ${{ matrix.vcpkg_version }} && ./bootstrap-vcpkg.sh
 
       - uses: actions/setup-python@v2
         with:
           python-version: '3.7'
+
+      - name: "Create directory '${{ env.VCPKG_DEFAULT_BINARY_CACHE }}'"
+        run: mkdir -p $VCPKG_DEFAULT_BINARY_CACHE
+        shell: bash
 
       - name: Checkout DuckDB to version
         if: ${{ matrix.duckdb_version != '<submodule_version>'}}
@@ -39,40 +77,41 @@ jobs:
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
 
-      - name: Install OpenSSL
-        shell: bash
-        run: |
-          mkdir -p build/openssl
-          cd build/openssl
-          mkdir sources build
-          curl https://www.openssl.org/source/openssl-3.0.5.tar.gz | tar xv -C sources --strip-components 1
-          export OPENSSL_ROOT_DIR=`pwd`/build
-          cd sources
-          export CC="clang -arch x86_64 -arch arm64"
-          perl ./Configure --prefix=$OPENSSL_ROOT_DIR darwin64-x86_64-cc no-asm
-          make -j
-          make install_sw
-
-      - name: Get OpenSSL path
-        shell: bash
-        run: |
-          export OPENSSL_ROOT_DIR=`pwd`/build/openssl/build
-          echo "OPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR" >> $GITHUB_ENV
-
-         # Build extension
+      # Restore vcpkg from the GitHub Action cache service. Note that packages are restored by vcpkg's binary caching
+      # when it is being run afterwards by CMake.
+      - name: Restore vcpkg
+        uses: actions/cache@v3
+        with:
+          # The first path is the location of vcpkg: it contains the vcpkg executable and data files, as long as the
+          # built package archives (aka binary cache) which are located by VCPKG_DEFAULT_BINARY_CACHE env var.
+          # The other paths starting with '!' are exclusions: they contain termporary files generated during the build of the installed packages.
+          path: |
+            ${{ env.VCPKG_ROOT }}
+            !${{ env.VCPKG_ROOT }}/buildtrees
+            !${{ env.VCPKG_ROOT }}/packages
+            !${{ env.VCPKG_ROOT }}/downloads
+            !${{ env.VCPKG_ROOT }}/installed
+          # The key is composed in a way that it gets properly invalidated whenever a different version of vcpkg is being used.
+          key: ${{matrix.vcpkg_version}}${{matrix.vcpkg_triplet}}
+      
+      # Build extension
       - name: Build extension
         shell: bash
-        env:
-          OPENSSL_ROOT_DIR: ${{ env.OPENSSL_ROOT_DIR }}
         run: |
-          make release
-          make test
+          make test_release_ci
 
       - uses: actions/upload-artifact@v2
         with:
-          name: osx-extensions
+          name: osx-${{ matrix.osx_build_arch }}-extension
           path: |
             build/release/extension/iceberg/iceberg.duckdb_extension
+
+      # Build extension
+      - name: Test Extension
+        if: ${{ matrix.osx_build_arch == 'x86_64'}}
+        shell: bash
+        run: |
+          make test
 
       - name: Deploy
         env:
@@ -80,22 +119,20 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_DEPLOY_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.S3_REGION }}
           BUCKET_NAME: ${{ secrets.S3_BUCKET }}
+          DUCKDB_EXTENSION_SIGNING_PK: ${{ secrets.DUCKDB_EXTENSION_SIGNING_KEY }}
         run: |
+          git config --global --add safe.directory '*'
           cd duckdb
           git fetch --tags
           export DUCKDB_VERSION=`git tag --points-at HEAD`
-          echo $DUCKDB_VERSION
           export DUCKDB_VERSION=${DUCKDB_VERSION:=`git log -1 --format=%h`}
-          echo $DUCKDB_VERSION
           cd ..
           if [[ "$AWS_ACCESS_KEY_ID" == "" ]] ; then
             echo 'No key set, skipping'
           elif [[ "$GITHUB_REF" =~ ^(refs/tags/v.+)$ ]] ; then
-            python -m pip install awscli
-            ./scripts/extension-upload.sh iceberg ${{ github.ref_name }} $DUCKDB_VERSION osx_amd64 $BUCKET_NAME true
-            ./scripts/extension-upload.sh iceberg ${{ github.ref_name }} $DUCKDB_VERSION osx_arm64 $BUCKET_NAME true
+            python3 -m pip install pip awscli
+            ./scripts/extension-upload.sh iceberg ${{ github.ref_name }} $DUCKDB_VERSION ${{matrix.duckdb_arch}} $BUCKET_NAME true
           elif [[ "$GITHUB_REF" =~ ^(refs/heads/main)$ ]] ; then
-            python -m pip install awscli
-            ./scripts/extension-upload.sh iceberg `git log -1 --format=%h` $DUCKDB_VERSION osx_amd64 $BUCKET_NAME false
-            ./scripts/extension-upload.sh iceberg `git log -1 --format=%h` $DUCKDB_VERSION osx_arm64 $BUCKET_NAME false
+            python3 -m pip install pip awscli
+            ./scripts/extension-upload.sh iceberg `git log -1 --format=%h` $DUCKDB_VERSION ${{matrix.duckdb_arch}} $BUCKET_NAME false
           fi

@@ -6,14 +6,19 @@ MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 PROJ_DIR := $(dir $(MKFILE_PATH))
 
 OSX_BUILD_UNIVERSAL_FLAG=
-ifeq (${OSX_BUILD_UNIVERSAL}, 1)
-	OSX_BUILD_UNIVERSAL_FLAG=-DOSX_BUILD_UNIVERSAL=1
+ifneq (${OSX_BUILD_ARCH}, "")
+	OSX_BUILD_UNIVERSAL_FLAG=-DOSX_BUILD_ARCH=${OSX_BUILD_ARCH}
 endif
 ifeq (${STATIC_LIBCPP}, 1)
 	STATIC_LIBCPP=-DSTATIC_LIBCPP=TRUE
 endif
-ifeq (${OSX_BUILD_UNIVERSAL}, 1)
-	OSX_BUILD_UNIVERSAL_FLAG=-DOSX_BUILD_UNIVERSAL=1
+
+VCPKG_TOOLCHAIN_PATH?=
+ifneq ("${VCPKG_TOOLCHAIN_PATH}", "")
+	TOOLCHAIN_FLAGS:=${TOOLCHAIN_FLAGS} -DVCPKG_MANIFEST_DIR='${PROJ_DIR}' -DCMAKE_TOOLCHAIN_FILE='${VCPKG_TOOLCHAIN_PATH}'
+endif
+ifneq ("${VCPKG_TARGET_TRIPLET}", "")
+	TOOLCHAIN_FLAGS:=${TOOLCHAIN_FLAGS} -DVCPKG_TARGET_TRIPLET='${VCPKG_TARGET_TRIPLET}'
 endif
 
 ifeq ($(GEN),ninja)
@@ -21,7 +26,7 @@ ifeq ($(GEN),ninja)
 	FORCE_COLOR=-DFORCE_COLORED_OUTPUT=1
 endif
 
-BUILD_FLAGS=-DEXTENSION_STATIC_BUILD=1 -DBUILD_ICU_EXTENSION=1 -DBUILD_TPCH_EXTENSION=1 -DBUILD_JSON_EXTENSION=1 -DBUILD_PARQUET_EXTENSION=1 ${OSX_BUILD_UNIVERSAL_FLAG} ${STATIC_LIBCPP}
+BUILD_FLAGS=-DBUILD_HTTPFS_EXTENSION=1 -DEXTENSION_STATIC_BUILD=1 -DBUILD_JSON_EXTENSION=1 -DBUILD_TPCH_EXTENSION=1 -DBUILD_PARQUET_EXTENSION=1 ${OSX_BUILD_UNIVERSAL_FLAG} ${STATIC_LIBCPP} ${TOOLCHAIN_FLAGS}
 
 CLIENT_FLAGS :=
 
@@ -40,17 +45,17 @@ clean:
 # Main build
 debug:
 	mkdir -p  build/debug && \
-	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) -DOPENSSL_USE_STATIC_LIBS=1 -DBUILD_HTTPFS_EXTENSION=1 ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Debug ${BUILD_FLAGS} -S ./duckdb/ -B build/debug && \
+	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Debug ${BUILD_FLAGS} -S ./duckdb/ -B build/debug && \
 	cmake --build build/debug --config Debug
 
 release:
 	mkdir -p build/release && \
-	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${OSX_BUILD_UNIVERSAL_FLAG} -DOPENSSL_USE_STATIC_LIBS=1 -DBUILD_HTTPFS_EXTENSION=1 ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S ./duckdb/ -B build/release && \
+	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=Release ${BUILD_FLAGS} -S ./duckdb/ -B build/release && \
 	cmake --build build/release --config Release
 
 reldebug:
 	mkdir -p build/release && \
-	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) -DOPENSSL_USE_STATIC_LIBS=1 -DBUILD_HTTPFS_EXTENSION=1 ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo ${BUILD_FLAGS} -S ./duckdb/ -B build/reldebug && \
+	cmake $(GENERATOR) $(FORCE_COLOR) $(EXTENSION_FLAGS) ${CLIENT_FLAGS} -DEXTENSION_STATIC_BUILD=1 -DCMAKE_BUILD_TYPE=RelWithDebInfo ${BUILD_FLAGS} -S ./duckdb/ -B build/reldebug && \
 	cmake --build build/release --config RelWithDebInfo
 
 # Client build
@@ -70,19 +75,19 @@ release_r: CLIENT_FLAGS=-DBUILD_R=1
 release_r: release
 
 release_python: CLIENT_FLAGS=-DBUILD_PYTHON=1 -DBUILD_FTS_EXTENSION=1 -DBUILD_TPCH_EXTENSION=1 -DBUILD_VISUALIZER_EXTENSION=1 -DBUILD_TPCDS_EXTENSION=1
-release_python: debug
+release_python: release
 
 # Main tests
 test: test_release
 
-test_release: release
+test_release_ci: release
 	./build/release/test/unittest --test-dir . "*.test"
 
-test_release_all: release
+test_release: release
 	./build/release/test/unittest --test-dir . "[sql]"
 
 test_debug: debug
-	./build/debug/test/unittest --test-dir . "*.test"
+	./build/debug/test/unittest --test-dir . "[sql]"
 
 # Client tests
 test_js: test_debug_js
