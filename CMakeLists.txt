@@ -4,6 +4,9 @@ cmake_minimum_required(VERSION 2.8.12)
 set(TARGET_NAME iceberg)
 project(${TARGET_NAME})
 
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
 set(EXTENSION_NAME ${TARGET_NAME}_extension)
 include_directories(src/include)
 include_directories(duckdb/extension/json/yyjson/include)
@@ -25,14 +28,14 @@ set(PARAMETERS "-warnings")
 build_loadable_extension(${TARGET_NAME} ${PARAMETERS} ${EXTENSION_SOURCES})
 
 ### AVRO
-# TODO: can we not build the avro docs here?
 # TODO: unfortunately, vcpkg's version of Avro-CPP does not work with iceberg spec. It doesnt properly handle non-string
 #       custom attributes in this line: https://github.com/apache/avro/blob/e44b680621328c4e6524bd2983af1ce11afeebed/lang/c%2B%2B/impl/Compiler.cc#L278
 #       when it does, we can switch back to the much simpler vcpkg based build
+# TODO2: PR the patched version to vcpkg, then switch back to
 include(ExternalProject)
 ExternalProject_Add(avro_cpp_project
-        GIT_REPOSITORY "https://github.com/apache/avro"
-        GIT_TAG "release-1.11.1"
+        GIT_REPOSITORY "https://github.com/samansmink/avro"
+        GIT_TAG "12379c9760b38a97668d54697a640a162aede1ee"
         GIT_CONFIG advice.detachedHead=false
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/avro-cpp-project"
         SOURCE_SUBDIR "lang/c++"
@@ -41,6 +44,10 @@ ExternalProject_Add(avro_cpp_project
         "-DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=true"
         "-DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/avro-cpp-project/install"
         "-DCMAKE_OSX_ARCHITECTURES:STRING=${OSX_BUILD_ARCH}"
+        "-DCMAKE_TOOLCHAIN_FILE:STRING=${CMAKE_TOOLCHAIN_FILE}"
+        "-DCMAKE_CXX_STANDARD:STRING=14"
+        "-DCMAKE_CXX_STANDARD_REQUIRED:BOOL=true"
+        "-DVCPKG_TARGET_TRIPLET:STRING=${VCPKG_TARGET_TRIPLET}"
         BUILD_BYPRODUCTS  "${CMAKE_CURRENT_BINARY_DIR}/avro-cpp-project/install/lib/${CMAKE_STATIC_LIBRARY_PREFIX}avrocpp_s${CMAKE_STATIC_LIBRARY_SUFFIX}"
         )
 add_library(avro_cpp_static STATIC IMPORTED)

@@ -1,10 +1,16 @@
 {
   "dependencies": [
+    "boost-algorithm",
+    "boost-any",
+    "boost-crc",
     "boost-filesystem",
-    "boost-iostreams",
-    "boost-program-options",
-    "boost-system",
     "boost-format",
+    "boost-iostreams",
+    "boost-lexical-cast",
+    "boost-math",
+    "boost-program-options",
+    "boost-random",
+    "boost-tuple",
     "snappy",
     "zlib",
     "openssl"
