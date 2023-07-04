@@ -1,8 +1,27 @@
-# DuckDB Iceberg extension
-Extension for DuckDB to read from Apache Iceberg.
+# DuckDB extension for Apache Iceberg 
+**Disclaimer:** This extension is currently in an experimental state. Feel free to try it out, but be aware that minimal testing and
+benchmarking was done.
 
-# Building
-To build the extension, install the dependencies (see below) and run
+This repository contains a DuckDB extension that adds support for [Apache Iceberg](https://iceberg.apache.org/). In its current state, the extension offers some basics features that allow listing snapshots and reading specific snapshots
+of a iceberg tables.
+
+# Acknowledgments
+This extension was initially developed as part of a customer project for [RelationalAI](https://relational.ai/),
+who have agreed to open source the extension. We would like to thank RelationalAI for their support
+and their commitment to open source enabling us to share this extension with the community.
+
+# Dependencies
+This extension has several dependencies. To build it, either install them manually, or use vcpkg
+to do dependency management. To install vcpkg check out the docs [here](https://vcpkg.io/en/getting-started.html).
+
+# Building the extension
+To build the extension with vcpkg, you can build this extension using:
+
+```shell
+VCPKG_TOOLCHAIN_PATH='<path_to_your_vcpkg_toolchain>' make
+```
+
+if you've manually installed the dependencies, you can simply run:
 ```shell
 make
 ```
@@ -27,12 +46,6 @@ path resolution allows scanning iceberg tables that are moved, which is useful d
 2	7635660646343998149	2023-02-15 15:08:14.73	0	lineitem_iceberg/metadata/snap-7635660646343998149-1-10eaca8a-1e1c-421e-ad6d-b232e5ee23d3.avro
 ```
 For more examples check the tests in the `test` directory
-
-# Dependencies
-Currently building the extension requires Boost as the Avro C++ library needs it. Additionally, if the extension was built on a system with Snappy, it also requires
-Snappy to run the extension. To install, run these commands (or something similar depending on platform):
-- Linux: `apt-get install libsnappy-dev libboost-dev`
-- MacOS: `brew install boost snappy`
 
 # Running tests
 ## Generating test data

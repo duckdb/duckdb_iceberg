@@ -6,6 +6,8 @@ require parquet
 
 require iceberg
 
+require-env DUCKDB_ICEBERG_HAVE_TEST_DATA
+
 # Check count matches
 query I
 SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_0_01/pyspark_iceberg_table');
