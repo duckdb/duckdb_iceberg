@@ -16,30 +16,23 @@ jobs:
       matrix:
         # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ '<submodule_version>' ]
-        arch: ['linux_amd64', 'linux_arm64', 'linux_amd64_gcc4']
+        arch: ['linux_amd64', 'linux_arm64']
         vcpkg_version: [ '2023.04.15' ]
         include:
           - arch: 'linux_amd64'
-            container: 'ubuntu:16.04'
+            container: 'quay.io/pypa/manylinux2014_x86_64'
             vcpkg_triplet: 'x64-linux'
           - arch: 'linux_arm64'
             container: 'ubuntu:18.04'
             vcpkg_triplet: 'arm64-linux'
-          - arch: 'linux_amd64_gcc4'
-            container: 'quay.io/pypa/manylinux2014_x86_64'
-            vcpkg_triplet: 'x64-linux'
     env:
       VCPKG_TARGET_TRIPLET: ${{ matrix.vcpkg_triplet }}
       GEN: Ninja
-      VCPKG_ROOT: ${{ github.workspace }}/vcpkg
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg/bincache
-      # Let's use GitHub Action cache as storage for the vcpkg Binary Caching feature.
-      VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
     steps:
       - name: Install required ubuntu packages
-        if: ${{ matrix.arch == 'linux_amd64' || matrix.arch == 'linux_arm64' }}
+        if: ${{ matrix.arch == 'linux_arm64' }}
         run: |
           apt-get update -y -qq
           apt-get install -y -qq software-properties-common
@@ -48,13 +41,8 @@ jobs:
           apt-get install -y -qq ninja-build make gcc-multilib g++-multilib libssl-dev wget openjdk-8-jdk zip maven unixodbc-dev libc6-dev-i386 lib32readline6-dev libssl-dev libcurl4-gnutls-dev libexpat1-dev gettext unzip build-essential checkinstall libffi-dev curl libz-dev openssh-client
           apt-get install -y -qq tar pkg-config
 
-      - name: Install additional centos dependencies
-        if: ${{ matrix.arch == 'linux_amd64_gcc4' }}
-        run: |
-          yum install -y curl zip unzip tar
-
       - name: Install Git 2.18.5
-        if: ${{ matrix.arch == 'linux_amd64' || matrix.arch == 'linux_arm64' }}
+        if: ${{ matrix.arch == 'linux_arm64' }}
         run: |
           wget https://github.com/git/git/archive/refs/tags/v2.18.5.tar.gz
           tar xvf v2.18.5.tar.gz
@@ -67,14 +55,6 @@ jobs:
         with:
           fetch-depth: 0
           submodules: 'true'
-      
-      # Set env vars needed for vcpkg to leverage the GitHub Action cache as a storage
-      # for Binary Caching.
-      - uses: actions/github-script@v6
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Checkout DuckDB to version
         if: ${{ matrix.duckdb_version != '<submodule_version>'}}
@@ -82,48 +62,21 @@ jobs:
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
 
-      - if: ${{ matrix.arch == 'linux_amd64_gcc4' }}
-        uses: ./duckdb/.github/actions/centos_7_setup
-        with:
-          openssl: 0
+      - name: Setup ManyLinux2014
+        if: ${{ matrix.arch == 'linux_amd64' }}
+        run: |
+          ./duckdb/scripts/scripts/setup_manylinux2014.sh general aws-cli ninja-build ccache ssh openssl python_alias
 
-      - if: ${{ matrix.arch == 'linux_amd64' || matrix.arch == 'linux_arm64' }}
+      - if: ${{ matrix.arch == 'linux_arm64' }}
         uses: ./duckdb/.github/actions/ubuntu_16_setup
         with:
-          aarch64_cross_compile: ${{ matrix.arch == 'linux_arm64' && 1 }}
-      
-      #    - name: Setup Ccache
-      #      uses: hendrikmuhs/ccache-action@main
-      #      with:
-      #        key: ${{ github.job }}-${{ matrix.duckdb_version }}
-      #        save: ${{ github.ref == 'refs/heads/master' || github.repository != 'duckdb/duckdb' }}
+          aarch64_cross_compile: 1
 
-      - name: setup vcpkg
-        run: |
-          git clone https://github.com/Microsoft/vcpkg.git
-          cd vcpkg && git checkout ${{ matrix.vcpkg_version }} && ./bootstrap-vcpkg.sh
-
-      - name: "Create directory '${{ env.VCPKG_DEFAULT_BINARY_CACHE }}'"
-        run: mkdir -p $VCPKG_DEFAULT_BINARY_CACHE
-        shell: bash
-      
-      # Restore vcpkg from the GitHub Action cache service. Note that packages are restored by vcpkg's binary caching
-      # when it is being run afterwards by CMake.
-      - name: Restore vcpkg
-        uses: actions/cache@v3
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
         with:
-          # The first path is the location of vcpkg: it contains the vcpkg executable and data files, as long as the
-          # built package archives (aka binary cache) which are located by VCPKG_DEFAULT_BINARY_CACHE env var.
-          # The other paths starting with '!' are exclusions: they contain termporary files generated during the build of the installed packages.
-          path: |
-            ${{ env.VCPKG_ROOT }}
-            !${{ env.VCPKG_ROOT }}/buildtrees
-            !${{ env.VCPKG_ROOT }}/packages
-            !${{ env.VCPKG_ROOT }}/downloads
-            !${{ env.VCPKG_ROOT }}/installed
-          # The key is composed in a way that it gets properly invalidated whenever a different version of vcpkg is being used.
-          key: ${{matrix.vcpkg_version}}${{matrix.vcpkg_triplet}}
-      
+          vcpkgGitCommitId: 501db0f17ef6df184fcdbfbe0f87cde2313b6ab1
+
       # Build extension
       - name: Build extension
         env:
@@ -134,10 +87,10 @@ jobs:
         run: |
           make release
 
-      - name: Build extension
+      - name: Test extension
         if: ${{ matrix.arch != 'linux_arm64'}}
         run: |
-          make test_release_ci
+          make test_release
 
       - uses: actions/upload-artifact@v2
         with:

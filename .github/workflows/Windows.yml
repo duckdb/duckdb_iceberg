@@ -21,9 +21,6 @@ jobs:
       VCPKG_TARGET_TRIPLET: ${{ matrix.vcpkg_triplet }}
       GEN: Ninja
       VCPKG_ROOT: ${{ github.workspace }}\vcpkg
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg\bincache
-      # Let's use GitHub Action cache as storage for the vcpkg Binary Caching feature.
-      VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
       VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}\vcpkg\scripts\buildsystems\vcpkg.cmake
 
     steps:
@@ -32,11 +29,10 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
-      - uses: actions/github-script@v6
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
         with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+          vcpkgGitCommitId: 501db0f17ef6df184fcdbfbe0f87cde2313b6ab1
 
       - uses: actions/setup-python@v2
         with:
@@ -49,35 +45,13 @@ jobs:
           cd duckdb
           git checkout ${{ matrix.duckdb_version }}
 
-      - name: setup vcpkg
-        run: |
-          git clone https://github.com/Microsoft/vcpkg.git
-          cd vcpkg && git checkout ${{ matrix.vcpkg_version }} && ./bootstrap-vcpkg.sh 
-
-      - name: "Create directory '${{ env.VCPKG_DEFAULT_BINARY_CACHE }}'"
-        run: mkdir -p $VCPKG_DEFAULT_BINARY_CACHE
-        shell: bash
-
-      # Restore vcpkg from the GitHub Action cache service. Note that packages are restored by vcpkg's binary caching
-      # when it is being run afterwards by CMake.
-      - name: Restore vcpkg
-        uses: actions/cache@v3
-        with:
-          # The first path is the location of vcpkg: it contains the vcpkg executable and data files, as long as the
-          # built package archives (aka binary cache) which are located by VCPKG_DEFAULT_BINARY_CACHE env var.
-          # The other paths starting with '!' are exclusions: they contain termporary files generated during the build of the installed packages.
-          path: |
-            ${{ env.VCPKG_ROOT }}
-            !${{ env.VCPKG_ROOT }}\buildtrees
-            !${{ env.VCPKG_ROOT }}\packages
-            !${{ env.VCPKG_ROOT }}\downloads
-            !${{ env.VCPKG_ROOT }}\installed
-          # The key is composed in a way that it gets properly invalidated whenever a different version of vcpkg is being used.
-          key: ${{matrix.vcpkg_version}}${{matrix.vcpkg_triplet}}
-
       - name: Build extension
         run: |
           make release
+
+      - name: Test Extension
+        shell: bash
+        run: |
           build/release/test/Release/unittest.exe --test-dir . "*.test"
 
       - uses: actions/upload-artifact@v2
