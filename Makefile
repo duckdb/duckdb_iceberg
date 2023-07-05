@@ -26,7 +26,7 @@ ifeq ($(GEN),ninja)
 	FORCE_COLOR=-DFORCE_COLORED_OUTPUT=1
 endif
 
-BUILD_FLAGS=-DEXTENSION_STATIC_BUILD=1 -DBUILD_EXTENSIONS="httpfs;json" ${OSX_BUILD_UNIVERSAL_FLAG} ${STATIC_LIBCPP} ${TOOLCHAIN_FLAGS}
+BUILD_FLAGS=-DEXTENSION_STATIC_BUILD=1 -DBUILD_EXTENSIONS="httpfs" ${OSX_BUILD_UNIVERSAL_FLAG} ${STATIC_LIBCPP} ${TOOLCHAIN_FLAGS}
 
 CLIENT_FLAGS :=
 
@@ -59,22 +59,22 @@ reldebug:
 	cmake --build build/release --config RelWithDebInfo
 
 # Client build
-debug_js: CLIENT_FLAGS=-DBUILD_NODE=1 -DBUILD_EXTENSIONS=json
+debug_js: CLIENT_FLAGS=-DBUILD_NODE=1
 debug_js: debug
 
 debug_r: CLIENT_FLAGS=-DBUILD_R=1
 debug_r: debug
 
-debug_python: CLIENT_FLAGS=-DBUILD_PYTHON=1 -DBUILD_EXTENSIONS=json;fts;tpch;visualizer;tpcds
+debug_python: CLIENT_FLAGS=-DBUILD_PYTHON=1 -DBUILD_EXTENSIONS=fts;tpch;visualizer;tpcds
 debug_python: debug
 
-release_js: CLIENT_FLAGS=-DBUILD_NODE=1 -DBUILD_EXTENSIONS=json
+release_js: CLIENT_FLAGS=-DBUILD_NODE=1
 release_js: release
 
 release_r: CLIENT_FLAGS=-DBUILD_R=1
 release_r: release
 
-release_python: CLIENT_FLAGS=-DBUILD_PYTHON=1 -DBUILD_EXTENSIONS=json;fts;tpch;visualizer;tpcds
+release_python: CLIENT_FLAGS=-DBUILD_PYTHON=1 -DBUILD_EXTENSIONS=fts;tpch;visualizer;tpcds
 release_python: release
 
 # Main tests
