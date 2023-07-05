@@ -1,4 +1,4 @@
-# name: test/sql/iceberg_scan_generated_data_0_01.test
+# name: test/sql/iceberg_scan_generated_data_0_01.test_slow
 # description: test iceberg extension with the sf0.01 generated test set
 # group: [iceberg]
 
@@ -6,7 +6,7 @@ require parquet
 
 require iceberg
 
-require-env DUCKDB_ICEBERG_HAVE_TEST_DATA
+#require-env DUCKDB_ICEBERG_HAVE_TEST_DATA
 
 # Check count matches
 query I

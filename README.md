@@ -3,7 +3,7 @@
 benchmarking was done.
 
 This repository contains a DuckDB extension that adds support for [Apache Iceberg](https://iceberg.apache.org/). In its current state, the extension offers some basics features that allow listing snapshots and reading specific snapshots
-of a iceberg tables.
+of an iceberg tables.
 
 # Acknowledgments
 This extension was initially developed as part of a customer project for [RelationalAI](https://relational.ai/),
@@ -11,8 +11,16 @@ who have agreed to open source the extension. We would like to thank RelationalA
 and their commitment to open source enabling us to share this extension with the community.
 
 # Dependencies
-This extension has several dependencies. To build it, either install them manually, or use vcpkg
-to do dependency management. To install vcpkg check out the docs [here](https://vcpkg.io/en/getting-started.html).
+
+## building
+This extension has several dependencies. Currently, the main way to install them is through vcpkg. To install vcpkg, 
+check out the docs [here](https://vcpkg.io/en/getting-started.html). Note that this extension contains a custom vcpkg port
+that overrides the existing 'avro-cpp' port of vcpkg. The reason for this is that the other versions of avro-cpp have
+some issue that seems to cause issues with the avro files produced by the spark iceberg extension.
+
+## test data generation
+To generate test data, the script in 'scripts/test_data_generator' is used to have spark generate some test data. This is 
+based on pyspark 3.4, which you can install through pip. 
 
 # Building the extension
 To build the extension with vcpkg, you can build this extension using:
@@ -21,10 +29,6 @@ To build the extension with vcpkg, you can build this extension using:
 VCPKG_TOOLCHAIN_PATH='<path_to_your_vcpkg_toolchain>' make
 ```
 
-if you've manually installed the dependencies, you can simply run:
-```shell
-make
-```
 This will build both the separate loadable extension and a duckdb binary with the extension pre-loaded:
 ```shell
 ./build/release/duckdb

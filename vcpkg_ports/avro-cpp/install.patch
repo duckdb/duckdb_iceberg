@@ -1,0 +1,810 @@
+diff --git a/lang/c++/CMakeLists.txt b/lang/c++/CMakeLists.txt
+index 6098613ed..7ba0a8f08 100644
+--- a/lang/c++/CMakeLists.txt
++++ b/lang/c++/CMakeLists.txt
+@@ -51,6 +51,8 @@ list(GET AVRO_VERSION 2 AVRO_VERSION_PATCH)
+ project (Avro-cpp)
+ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR})
+ 
++find_package(ZLIB REQUIRED)
++
+ if (WIN32 AND NOT CYGWIN AND NOT MSYS)
+     add_definitions (/EHa)
+     add_definitions (
+@@ -120,7 +122,7 @@ set_property (TARGET avrocpp
+     APPEND PROPERTY COMPILE_DEFINITIONS AVRO_DYN_LINK)
+ 
+ add_library (avrocpp_s STATIC ${AVRO_SOURCE_FILES})
+-target_include_directories(avrocpp_s PRIVATE ${SNAPPY_INCLUDE_DIR})
++target_include_directories(avrocpp_s PRIVATE ${SNAPPY_INCLUDE_DIR} impl/json)
+ 
+ set_property (TARGET avrocpp avrocpp_s
+     APPEND PROPERTY COMPILE_DEFINITIONS AVRO_SOURCE)
+@@ -131,12 +133,12 @@ set_target_properties (avrocpp PROPERTIES
+ set_target_properties (avrocpp_s PROPERTIES
+     VERSION ${AVRO_VERSION_MAJOR}.${AVRO_VERSION_MINOR}.${AVRO_VERSION_PATCH})
+ 
+-target_link_libraries (avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES})
+-target_include_directories(avrocpp PRIVATE ${SNAPPY_INCLUDE_DIR})
++target_link_libraries (avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES} ZLIB::ZLIB)
++target_include_directories(avrocpp PRIVATE ${SNAPPY_INCLUDE_DIR} impl/json)
+ 
+ add_executable (precompile test/precompile.cc)
+ 
+-target_link_libraries (precompile avrocpp_s ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES})
++target_link_libraries (precompile avrocpp_s ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES} ZLIB::ZLIB)
+ 
+ macro (gen file ns)
+     add_custom_command (OUTPUT ${file}.hh
+@@ -166,37 +168,41 @@ gen (primitivetypes pt)
+ gen (cpp_reserved_words cppres)
+ 
+ add_executable (avrogencpp impl/avrogencpp.cc)
+-target_link_libraries (avrogencpp avrocpp_s ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES})
++target_link_libraries (avrogencpp avrocpp_s ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES} ZLIB::ZLIB)
+ 
+-enable_testing()
++if(BUILD_TESTING)
++  enable_testing()
++endif()
+ 
+ macro (unittest name)
+-    add_executable (${name} test/${name}.cc)
+-    target_link_libraries (${name} avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES})
++    add_executable (${name} test/${name}.cc impl/json/JsonIO.cc impl/json/JsonDom.cc)
++    target_link_libraries (${name} avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES} ZLIB::ZLIB)
+     add_test (NAME ${name} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+         COMMAND ${CMAKE_CURRENT_BINARY_DIR}/${name})
+ endmacro (unittest)
+ 
+-unittest (buffertest)
+-unittest (unittest)
+-unittest (SchemaTests)
+-unittest (LargeSchemaTests)
+-unittest (CodecTests)
+-unittest (StreamTests)
+-unittest (SpecificTests)
+-unittest (DataFileTests)
+-unittest (JsonTests)
+-unittest (AvrogencppTests)
+-unittest (CompilerTests)
+-unittest (AvrogencppTestReservedWords)
+-
+-add_dependencies (AvrogencppTestReservedWords cpp_reserved_words_hh)
+-
+-add_dependencies (AvrogencppTests bigrecord_hh bigrecord_r_hh bigrecord2_hh
+-    tweet_hh
+-    union_array_union_hh union_map_union_hh union_conflict_hh
+-    recursive_hh reuse_hh circulardep_hh tree1_hh tree2_hh crossref_hh
+-    primitivetypes_hh empty_record_hh)
++if(BUILD_TESTING)
++    unittest (buffertest)
++    unittest (unittest)
++    unittest (SchemaTests)
++    unittest (LargeSchemaTests)
++    unittest (CodecTests)
++    unittest (StreamTests)
++    unittest (SpecificTests)
++    unittest (DataFileTests)
++    unittest (JsonTests)
++    unittest (AvrogencppTests)
++    unittest (CompilerTests)
++    unittest (AvrogencppTestReservedWords)
++
++    add_dependencies (AvrogencppTestReservedWords cpp_reserved_words_hh)
++
++    add_dependencies (AvrogencppTests bigrecord_hh bigrecord_r_hh bigrecord2_hh
++        tweet_hh
++        union_array_union_hh union_map_union_hh union_conflict_hh
++        recursive_hh reuse_hh circulardep_hh tree1_hh tree2_hh crossref_hh
++        primitivetypes_hh empty_record_hh)
++endif()
+ 
+ include (InstallRequiredSystemLibraries)
+ 
+@@ -207,12 +213,14 @@ include (CPack)
+ install (TARGETS avrocpp avrocpp_s
+     LIBRARY DESTINATION lib
+     ARCHIVE DESTINATION lib
+-    RUNTIME DESTINATION lib)
++    RUNTIME DESTINATION bin)
+ 
+-install (TARGETS avrogencpp RUNTIME DESTINATION bin)
++install (TARGETS avrogencpp RUNTIME DESTINATION tools/bin)
+ 
+ install (DIRECTORY api/ DESTINATION include/avro
+     FILES_MATCHING PATTERN *.hh)
++install (DIRECTORY impl/json/ DESTINATION include/avro/impl/json
++        FILES_MATCHING PATTERN *.hh)
+ 
+ if (NOT CMAKE_BUILD_TYPE)
+     set (CMAKE_BUILD_TYPE Release CACHE STRING
+diff --git a/lang/c++/api/CustomFields.hh b/lang/c++/api/CustomFields.hh
+index 01468ff4a..a60e3341f 100644
+--- a/lang/c++/api/CustomFields.hh
++++ b/lang/c++/api/CustomFields.hh
+@@ -21,7 +21,7 @@
+ 
+ #include <iostream>
+ 
+-#include "../impl/json/JsonDom.hh"
++#include "JsonDom.hh"
+ 
+ namespace avro {
+ 
+diff --git a/lang/c++/api/JsonDom.hh b/lang/c++/api/JsonDom.hh
+new file mode 100644
+index 000000000..3fb5670b7
+--- /dev/null
++++ b/lang/c++/api/JsonDom.hh
+@@ -0,0 +1,183 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     https://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef avro_json_JsonDom_hh__
++#define avro_json_JsonDom_hh__
++
++#include <cstdint>
++#include <iostream>
++#include <map>
++#include <memory>
++#include <string>
++#include <vector>
++
++#include "Config.hh"
++#include "boost/any.hpp"
++
++namespace avro {
++
++class AVRO_DECL InputStream;
++
++namespace json {
++class Entity;
++
++typedef bool Bool;
++typedef int64_t Long;
++typedef double Double;
++typedef std::string String;
++typedef std::vector<Entity> Array;
++typedef std::map<std::string, Entity> Object;
++
++class AVRO_DECL JsonParser;
++class JsonNullFormatter;
++
++template<typename F = JsonNullFormatter>
++class AVRO_DECL JsonGenerator;
++
++enum class EntityType {
++    Null,
++    Bool,
++    Long,
++    Double,
++    String,
++    Arr,
++    Obj
++};
++
++const char *typeToString(EntityType t);
++
++inline std::ostream &operator<<(std::ostream &os, EntityType et) {
++    return os << typeToString(et);
++}
++
++class AVRO_DECL Entity {
++    EntityType type_;
++    boost::any value_;
++    size_t line_; // can't be const else noncopyable...
++
++    void ensureType(EntityType) const;
++
++public:
++    explicit Entity(size_t line = 0) : type_(EntityType::Null), line_(line) {}
++    // Not explicit because do want implicit conversion
++    // NOLINTNEXTLINE(google-explicit-constructor)
++    Entity(Bool v, size_t line = 0) : type_(EntityType::Bool), value_(v), line_(line) {}
++    // Not explicit because do want implicit conversion
++    // NOLINTNEXTLINE(google-explicit-constructor)
++    Entity(Long v, size_t line = 0) : type_(EntityType::Long), value_(v), line_(line) {}
++    // Not explicit because do want implicit conversion
++    // NOLINTNEXTLINE(google-explicit-constructor)
++    Entity(Double v, size_t line = 0) : type_(EntityType::Double), value_(v), line_(line) {}
++    // Not explicit because do want implicit conversion
++    // NOLINTNEXTLINE(google-explicit-constructor)
++    Entity(const std::shared_ptr<String> &v, size_t line = 0) : type_(EntityType::String), value_(v), line_(line) {}
++    // Not explicit because do want implicit conversion
++    // NOLINTNEXTLINE(google-explicit-constructor)
++    Entity(const std::shared_ptr<Array> &v, size_t line = 0) : type_(EntityType::Arr), value_(v), line_(line) {}
++    // Not explicit because do want implicit conversion
++    // NOLINTNEXTLINE(google-explicit-constructor)
++    Entity(const std::shared_ptr<Object> &v, size_t line = 0) : type_(EntityType::Obj), value_(v), line_(line) {}
++
++    EntityType type() const { return type_; }
++
++    size_t line() const { return line_; }
++
++    Bool boolValue() const {
++        ensureType(EntityType::Bool);
++        return boost::any_cast<Bool>(value_);
++    }
++
++    Long longValue() const {
++        ensureType(EntityType::Long);
++        return boost::any_cast<Long>(value_);
++    }
++
++    Double doubleValue() const {
++        ensureType(EntityType::Double);
++        return boost::any_cast<Double>(value_);
++    }
++
++    String stringValue() const;
++
++    String bytesValue() const;
++
++    const Array &arrayValue() const {
++        ensureType(EntityType::Arr);
++        return **boost::any_cast<std::shared_ptr<Array>>(&value_);
++    }
++
++    const Object &objectValue() const {
++        ensureType(EntityType::Obj);
++        return **boost::any_cast<std::shared_ptr<Object>>(&value_);
++    }
++
++    std::string toString() const;
++};
++
++template<typename T>
++struct type_traits {
++};
++
++template<>
++struct type_traits<bool> {
++    static EntityType type() { return EntityType::Bool; }
++    static const char *name() { return "bool"; }
++};
++
++template<>
++struct type_traits<int64_t> {
++    static EntityType type() { return EntityType::Long; }
++    static const char *name() { return "long"; }
++};
++
++template<>
++struct type_traits<double> {
++    static EntityType type() { return EntityType::Double; }
++    static const char *name() { return "double"; }
++};
++
++template<>
++struct type_traits<std::string> {
++    static EntityType type() { return EntityType::String; }
++    static const char *name() { return "string"; }
++};
++
++template<>
++struct type_traits<std::vector<Entity>> {
++    static EntityType type() { return EntityType::Arr; }
++    static const char *name() { return "array"; }
++};
++
++template<>
++struct type_traits<std::map<std::string, Entity>> {
++    static EntityType type() { return EntityType::Obj; }
++    static const char *name() { return "object"; }
++};
++
++AVRO_DECL Entity readEntity(JsonParser &p);
++
++AVRO_DECL Entity loadEntity(InputStream &in);
++AVRO_DECL Entity loadEntity(const char *text);
++AVRO_DECL Entity loadEntity(const uint8_t *text, size_t len);
++
++void writeEntity(JsonGenerator<JsonNullFormatter> &g, const Entity &n);
++
++} // namespace json
++} // namespace avro
++
++#endif
+diff --git a/lang/c++/api/JsonIO.hh b/lang/c++/api/JsonIO.hh
+new file mode 100644
+index 000000000..94889e5d0
+--- /dev/null
++++ b/lang/c++/api/JsonIO.hh
+@@ -0,0 +1,481 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *     https://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef avro_json_JsonIO_hh__
++#define avro_json_JsonIO_hh__
++
++#include <boost/lexical_cast.hpp>
++#include <boost/math/special_functions/fpclassify.hpp>
++#include <boost/utility.hpp>
++#include <locale>
++#include <sstream>
++#include <stack>
++#include <string>
++
++#include "Config.hh"
++#include "Stream.hh"
++
++namespace avro {
++namespace json {
++
++inline char toHex(unsigned int n) {
++    return (n < 10) ? (n + '0') : (n + 'a' - 10);
++}
++
++class AVRO_DECL JsonParser : boost::noncopyable {
++public:
++    enum class Token {
++        Null,
++        Bool,
++        Long,
++        Double,
++        String,
++        ArrayStart,
++        ArrayEnd,
++        ObjectStart,
++        ObjectEnd
++    };
++
++    size_t line() const { return line_; }
++
++private:
++    enum State {
++        stValue,   // Expect a data type
++        stArray0,  // Expect a data type or ']'
++        stArrayN,  // Expect a ',' or ']'
++        stObject0, // Expect a string or a '}'
++        stObjectN, // Expect a ',' or '}'
++        stKey      // Expect a ':'
++    };
++    std::stack<State> stateStack;
++    State curState;
++    bool hasNext;
++    char nextChar;
++    bool peeked;
++
++    StreamReader in_;
++    Token curToken;
++    bool bv;
++    int64_t lv;
++    double dv;
++    std::string sv;
++    size_t line_;
++
++    Token doAdvance();
++    Token tryLiteral(const char exp[], size_t n, Token tk);
++    Token tryNumber(char ch);
++    Token tryString();
++    static Exception unexpected(unsigned char ch);
++    char next();
++
++    static std::string decodeString(const std::string &s, bool binary);
++
++public:
++    JsonParser() : curState(stValue), hasNext(false), nextChar(0), peeked(false),
++                   curToken(Token::Null), bv(false), lv(0), dv(0), line_(1) {}
++
++    void init(InputStream &is) {
++        // Clear by swapping with an empty stack
++        std::stack<State>().swap(stateStack);
++        curState = stValue;
++        hasNext = false;
++        peeked = false;
++        line_ = 1;
++        in_.reset(is);
++    }
++
++    Token advance() {
++        if (!peeked) {
++            curToken = doAdvance();
++        } else {
++            peeked = false;
++        }
++        return curToken;
++    }
++
++    Token peek() {
++        if (!peeked) {
++            curToken = doAdvance();
++            peeked = true;
++        }
++        return curToken;
++    }
++
++    void expectToken(Token tk);
++
++    bool boolValue() const {
++        return bv;
++    }
++
++    Token cur() const {
++        return curToken;
++    }
++
++    double doubleValue() const {
++        return dv;
++    }
++
++    int64_t longValue() const {
++        return lv;
++    }
++
++    const std::string &rawString() const {
++        return sv;
++    }
++
++    std::string stringValue() const {
++        return decodeString(sv, false);
++    }
++
++    std::string bytesValue() const {
++        return decodeString(sv, true);
++    }
++
++    void drain() {
++        if (!stateStack.empty() || peeked) {
++            throw Exception("Invalid state for draining");
++        }
++        in_.drain(hasNext);
++        hasNext = false;
++    }
++
++    /**
++     * Return UTF-8 encoded string value.
++     */
++    static std::string toStringValue(const std::string &sv) {
++        return decodeString(sv, false);
++    }
++
++    /**
++     * Return byte-encoded string value. It is an error if the input
++     * JSON string contained unicode characters more than "\u00ff'.
++     */
++    static std::string toBytesValue(const std::string &sv) {
++        return decodeString(sv, true);
++    }
++
++    static const char *const tokenNames[];
++
++    static const char *toString(Token tk) {
++        return tokenNames[static_cast<size_t>(tk)];
++    }
++};
++
++class AVRO_DECL JsonNullFormatter {
++public:
++    explicit JsonNullFormatter(StreamWriter &) {}
++
++    void handleObjectStart() {}
++    void handleObjectEnd() {}
++    void handleValueEnd() {}
++    void handleColon() {}
++};
++
++class AVRO_DECL JsonPrettyFormatter {
++    StreamWriter &out_;
++    size_t level_;
++    std::vector<uint8_t> indent_;
++
++    static const int CHARS_PER_LEVEL = 2;
++
++    void printIndent() {
++        size_t charsToIndent = level_ * CHARS_PER_LEVEL;
++        if (indent_.size() < charsToIndent) {
++            indent_.resize(charsToIndent * 2, ' ');
++        }
++        out_.writeBytes(indent_.data(), charsToIndent);
++    }
++
++public:
++    explicit JsonPrettyFormatter(StreamWriter &out) : out_(out), level_(0), indent_(10, ' ') {}
++
++    void handleObjectStart() {
++        out_.write('\n');
++        ++level_;
++        printIndent();
++    }
++
++    void handleObjectEnd() {
++        out_.write('\n');
++        --level_;
++        printIndent();
++    }
++
++    void handleValueEnd() {
++        out_.write('\n');
++        printIndent();
++    }
++
++    void handleColon() {
++        out_.write(' ');
++    }
++};
++
++template<class F>
++class AVRO_DECL JsonGenerator {
++    StreamWriter out_;
++    F formatter_;
++    enum State {
++        stStart,
++        stArray0,
++        stArrayN,
++        stMap0,
++        stMapN,
++        stKey,
++    };
++
++    std::stack<State> stateStack;
++    State top;
++
++    void write(const char *b, const char *p) {
++        if (b != p) {
++            out_.writeBytes(reinterpret_cast<const uint8_t *>(b), p - b);
++        }
++    }
++
++    void escape(char c, const char *b, const char *p) {
++        write(b, p);
++        out_.write('\\');
++        out_.write(c);
++    }
++
++    void escapeCtl(char c) {
++        escapeUnicode(static_cast<uint8_t>(c));
++    }
++
++    void writeHex(char c) {
++        out_.write(toHex((static_cast<unsigned char>(c)) / 16));
++        out_.write(toHex((static_cast<unsigned char>(c)) % 16));
++    }
++
++    void escapeUnicode(uint32_t c) {
++        out_.write('\\');
++        out_.write('u');
++        writeHex((c >> 8) & 0xff);
++        writeHex(c & 0xff);
++    }
++    void doEncodeString(const char *b, size_t len, bool binary) {
++        const char *e = b + len;
++        out_.write('"');
++        for (const char *p = b; p != e; p++) {
++            if ((*p & 0x80) != 0) {
++                write(b, p);
++                if (binary) {
++                    escapeCtl(*p);
++                } else if ((*p & 0x40) == 0) {
++                    throw Exception("Invalid UTF-8 sequence");
++                } else {
++                    int more = 1;
++                    uint32_t value;
++                    if ((*p & 0x20) != 0) {
++                        more++;
++                        if ((*p & 0x10) != 0) {
++                            more++;
++                            if ((*p & 0x08) != 0) {
++                                throw Exception("Invalid UTF-8 sequence");
++                            } else {
++                                value = *p & 0x07;
++                            }
++                        } else {
++                            value = *p & 0x0f;
++                        }
++                    } else {
++                        value = *p & 0x1f;
++                    }
++                    for (int i = 0; i < more; ++i) {
++                        if (++p == e || (*p & 0xc0) != 0x80) {
++                            throw Exception("Invalid UTF-8 sequence");
++                        }
++                        value <<= 6;
++                        value |= *p & 0x3f;
++                    }
++                    escapeUnicode(value);
++                }
++            } else {
++                switch (*p) {
++                    case '\\':
++                    case '"':
++                    case '/':
++                        escape(*p, b, p);
++                        break;
++                    case '\b':
++                        escape('b', b, p);
++                        break;
++                    case '\f':
++                        escape('f', b, p);
++                        break;
++                    case '\n':
++                        escape('n', b, p);
++                        break;
++                    case '\r':
++                        escape('r', b, p);
++                        break;
++                    case '\t':
++                        escape('t', b, p);
++                        break;
++                    default:
++                        if (std::iscntrl(*p, std::locale::classic())) {
++                            write(b, p);
++                            escapeCtl(*p);
++                            break;
++                        } else {
++                            continue;
++                        }
++                }
++            }
++            b = p + 1;
++        }
++        write(b, e);
++        out_.write('"');
++    }
++
++    void sep() {
++        if (top == stArrayN) {
++            out_.write(',');
++            formatter_.handleValueEnd();
++        } else if (top == stArray0) {
++            top = stArrayN;
++        }
++    }
++
++    void sep2() {
++        if (top == stKey) {
++            top = stMapN;
++        }
++    }
++
++public:
++    JsonGenerator() : formatter_(out_), top(stStart) {}
++
++    void init(OutputStream &os) {
++        out_.reset(os);
++    }
++
++    void flush() {
++        out_.flush();
++    }
++
++    int64_t byteCount() const {
++        return out_.byteCount();
++    }
++
++    void encodeNull() {
++        sep();
++        out_.writeBytes(reinterpret_cast<const uint8_t *>("null"), 4);
++        sep2();
++    }
++
++    void encodeBool(bool b) {
++        sep();
++        if (b) {
++            out_.writeBytes(reinterpret_cast<const uint8_t *>("true"), 4);
++        } else {
++            out_.writeBytes(reinterpret_cast<const uint8_t *>("false"), 5);
++        }
++        sep2();
++    }
++
++    template<typename T>
++    void encodeNumber(T t) {
++        sep();
++        std::ostringstream oss;
++        oss << boost::lexical_cast<std::string>(t);
++        const std::string s = oss.str();
++        out_.writeBytes(reinterpret_cast<const uint8_t *>(s.data()), s.size());
++        sep2();
++    }
++
++    void encodeNumber(double t) {
++        sep();
++        std::ostringstream oss;
++        if (boost::math::isfinite(t)) {
++            oss << boost::lexical_cast<std::string>(t);
++        } else if (boost::math::isnan(t)) {
++            oss << "NaN";
++        } else if (t == std::numeric_limits<double>::infinity()) {
++            oss << "Infinity";
++        } else {
++            oss << "-Infinity";
++        }
++        const std::string s = oss.str();
++        out_.writeBytes(reinterpret_cast<const uint8_t *>(s.data()), s.size());
++        sep2();
++    }
++
++    void encodeString(const std::string &s) {
++        if (top == stMap0) {
++            top = stKey;
++        } else if (top == stMapN) {
++            out_.write(',');
++            formatter_.handleValueEnd();
++            top = stKey;
++        } else if (top == stKey) {
++            top = stMapN;
++        } else {
++            sep();
++        }
++        doEncodeString(s.c_str(), s.size(), false);
++        if (top == stKey) {
++            out_.write(':');
++            formatter_.handleColon();
++        }
++    }
++
++    void encodeBinary(const uint8_t *bytes, size_t len) {
++        sep();
++        doEncodeString(reinterpret_cast<const char *>(bytes), len, true);
++        sep2();
++    }
++
++    void arrayStart() {
++        sep();
++        stateStack.push(top);
++        top = stArray0;
++        out_.write('[');
++        formatter_.handleObjectStart();
++    }
++
++    void arrayEnd() {
++        top = stateStack.top();
++        stateStack.pop();
++        formatter_.handleObjectEnd();
++        out_.write(']');
++        sep2();
++    }
++
++    void objectStart() {
++        sep();
++        stateStack.push(top);
++        top = stMap0;
++        out_.write('{');
++        formatter_.handleObjectStart();
++    }
++
++    void objectEnd() {
++        top = stateStack.top();
++        stateStack.pop();
++        formatter_.handleObjectEnd();
++        out_.write('}');
++        sep2();
++    }
++};
++
++} // namespace json
++} // namespace avro
++
++#endif
