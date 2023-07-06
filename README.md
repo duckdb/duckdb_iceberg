@@ -1,3 +1,6 @@
+Warning: This extension currently builds with a feature branch of DuckDB. A PR is being worked on. When the PR is merged,
+this extension will be updated and usable from (nightly) DuckDB releases.
+
 # DuckDB extension for Apache Iceberg 
 **Disclaimer:** This extension is currently in an experimental state. Feel free to try it out, but be aware that minimal testing and
 benchmarking was done.
@@ -11,7 +14,6 @@ who have agreed to open source the extension. We would like to thank RelationalA
 and their commitment to open source enabling us to share this extension with the community.
 
 # Dependencies
-
 ## building
 This extension has several dependencies. Currently, the main way to install them is through vcpkg. To install vcpkg, 
 check out the docs [here](https://vcpkg.io/en/getting-started.html). Note that this extension contains a custom vcpkg port
@@ -41,8 +43,8 @@ The easiest way is to start the duckdb binary produced by the build step: `./bui
 > SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE);
 51793
 ```
-Note that for testing, the allow_moved_paths option is available. This option will ensure some path resolution is performed. This
-path resolution allows scanning iceberg tables that are moved, which is useful during testing.
+Note that for testing, the `ALLOW_MOVED_PATHS` option is available. This option will ensure some path resolution is performed. This
+path resolution allows scanning iceberg tables that are moved, which is used during testing.
 
 ```SQL
 > SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE);

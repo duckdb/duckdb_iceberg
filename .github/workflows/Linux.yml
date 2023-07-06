@@ -65,7 +65,7 @@ jobs:
       - name: Setup ManyLinux2014
         if: ${{ matrix.arch == 'linux_amd64' }}
         run: |
-          ./duckdb/scripts/setup_manylinux2014.sh general aws-cli ninja-build ccache ssh openssl python_alias
+          ./duckdb/scripts/setup_manylinux2014.sh general aws-cli ccache ssh openssl python_alias
 
       - if: ${{ matrix.arch == 'linux_arm64' }}
         uses: ./duckdb/.github/actions/ubuntu_16_setup
