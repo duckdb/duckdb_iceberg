@@ -67,7 +67,7 @@ Running the S3 test cases requires the minio test server to be running and popul
 Note that this requires to have run `make data` before and also to have the aws cli and docker compose installed.
 
 
-# Acknowledgments
+# Acknowledgements
 This extension was initially developed as part of a customer project for [RelationalAI](https://relational.ai/),
 who have agreed to open source the extension. We would like to thank RelationalAI for their support
 and their commitment to open source enabling us to share this extension with the community.
