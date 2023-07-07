@@ -1,6 +1,9 @@
 {
   "dependencies": [
-    "avro-cpp",
+    {
+      "name": "avro-cpp",
+      "features": ["snappy"]
+    },
     "openssl"
   ],
   "vcpkg-configuration": {
