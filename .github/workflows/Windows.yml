@@ -61,6 +61,11 @@ jobs:
           path: |
             build/release/extension/iceberg/iceberg.duckdb_extension
 
+      - name: error log
+        if: always()
+        shell: bash
+        run: cat D:/a/duckdb_iceberg/duckdb_iceberg/vcpkg/buildtrees/avro-cpp/install-x64-windows-static-md-dbg-out.log
+
       - name: Deploy
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.S3_DEPLOY_ID }}
