@@ -35,7 +35,7 @@ include_directories("${AVROCPP_INCLUDE_DIR}")
 
 # NOTE: avro package doesn't support linking static libs even though they are in fact built. The workaround is this mess
 # that will link the dependencies for us
-set(SNAPPY_HOME "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}")
+set(SNAPPY_HOME "${AVROCPP_ROOT_FIND_DIR}")
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS iostreams program_options system filesystem)
 find_package(Snappy CONFIG REQUIRED)
