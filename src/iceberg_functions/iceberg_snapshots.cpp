@@ -26,7 +26,8 @@ public:
 
 		FileSystem &fs = FileSystem::GetFileSystem(context);
 		global_state->metadata_file = IcebergSnapshot::ReadMetaData(bind_data.filename, fs);
-		global_state->metadata_doc = yyjson_read(global_state->metadata_file.c_str(), global_state->metadata_file.size(), 0);
+		global_state->metadata_doc =
+		    yyjson_read(global_state->metadata_file.c_str(), global_state->metadata_file.size(), 0);
 		auto root = yyjson_doc_get_root(global_state->metadata_doc);
 		auto snapshots = yyjson_obj_get(root, "snapshots");
 		yyjson_arr_iter_init(snapshots, &global_state->snapshot_it);
@@ -61,7 +62,7 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 
 // Snapshots function
 static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
-	auto& global_state = data.global_state->Cast<IcebergSnapshotGlobalTableFunctionState>();
+	auto &global_state = data.global_state->Cast<IcebergSnapshotGlobalTableFunctionState>();
 
 	idx_t i = 0;
 	while (auto next_snapshot = yyjson_arr_iter_next(&global_state.snapshot_it)) {
@@ -83,8 +84,8 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 
 TableFunctionSet IcebergFunctions::GetIcebergSnapshotsFunction() {
 	TableFunctionSet function_set("iceberg_snapshots");
-	TableFunction table_function( {LogicalType::VARCHAR}, IcebergSnapshotsFunction,
-	                             IcebergSnapshotsBind, IcebergSnapshotGlobalTableFunctionState::Init);
+	TableFunction table_function({LogicalType::VARCHAR}, IcebergSnapshotsFunction, IcebergSnapshotsBind,
+	                             IcebergSnapshotGlobalTableFunctionState::Init);
 	function_set.AddFunction(table_function);
 	return function_set;
 }

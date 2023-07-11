@@ -30,7 +30,6 @@ namespace duckdb {
 
 struct IcebergMetaDataBindData : public TableFunctionData {
 	unique_ptr<IcebergTable> iceberg_table;
-
 };
 
 struct IcebergMetaDataGlobalTableFunctionState : public GlobalTableFunctionState {
@@ -48,7 +47,7 @@ public:
 };
 
 static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, TableFunctionBindInput &input,
-                                                     vector<LogicalType> &return_types, vector<string> &names) {
+                                                    vector<LogicalType> &return_types, vector<string> &names) {
 	// return a TableRef that contains the scans for the
 	auto ret = make_uniq<IcebergMetaDataBindData>();
 
@@ -69,7 +68,8 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
 			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>());
 		} else if (input.inputs[1].type() == LogicalType::TIMESTAMP) {
-			snapshot_to_scan = IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>());
+			snapshot_to_scan =
+			    IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>());
 		} else {
 			throw InvalidInputException("Unknown argument type in IcebergScanBindReplace.");
 		}
@@ -77,7 +77,8 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs);
 	}
 
-	ret->iceberg_table = make_uniq<IcebergTable>(IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths));
+	ret->iceberg_table =
+	    make_uniq<IcebergTable>(IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths));
 
 	auto manifest_types = IcebergManifest::Types();
 	return_types.insert(return_types.end(), manifest_types.begin(), manifest_types.end());
@@ -98,14 +99,15 @@ static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFun
 }
 
 static void IcebergMetaDataFunction(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
-	auto& bind_data = data.bind_data->Cast<IcebergMetaDataBindData>();
-	auto& global_state = data.global_state->Cast<IcebergMetaDataGlobalTableFunctionState>();
+	auto &bind_data = data.bind_data->Cast<IcebergMetaDataBindData>();
+	auto &global_state = data.global_state->Cast<IcebergMetaDataGlobalTableFunctionState>();
 
 	idx_t out = 0;
 	auto manifests = bind_data.iceberg_table->entries;
 	for (; global_state.current_manifest_idx < manifests.size(); global_state.current_manifest_idx++) {
 		auto manifest_entries = manifests[global_state.current_manifest_idx].manifest_entries;
-		for (; global_state.current_manifest_entry_idx < manifest_entries.size();  global_state.current_manifest_entry_idx++) {
+		for (; global_state.current_manifest_entry_idx < manifest_entries.size();
+		     global_state.current_manifest_entry_idx++) {
 			if (out >= STANDARD_VECTOR_SIZE) {
 				output.SetCardinality(out);
 				return;
@@ -113,14 +115,21 @@ static void IcebergMetaDataFunction(ClientContext &context, TableFunctionInput &
 			auto manifest = manifests[global_state.current_manifest_idx];
 			auto manifest_entry = manifest_entries[global_state.current_manifest_entry_idx];
 
-			FlatVector::GetData<string_t>(output.data[0])[out] = StringVector::AddString(output.data[0], string_t(manifest.manifest.manifest_path));;
+			FlatVector::GetData<string_t>(output.data[0])[out] =
+			    StringVector::AddString(output.data[0], string_t(manifest.manifest.manifest_path));
+			;
 			FlatVector::GetData<int64_t>(output.data[1])[out] = manifest.manifest.sequence_number;
-			FlatVector::GetData<string_t>(output.data[2])[out] = StringVector::AddString(output.data[2], string_t(IcebergManifestContentTypeToString(manifest.manifest.content)));
+			FlatVector::GetData<string_t>(output.data[2])[out] = StringVector::AddString(
+			    output.data[2], string_t(IcebergManifestContentTypeToString(manifest.manifest.content)));
 
-			FlatVector::GetData<string_t>(output.data[3])[out] = StringVector::AddString(output.data[3], string_t(IcebergManifestEntryStatusTypeToString(manifest_entry.status)));
-			FlatVector::GetData<string_t>(output.data[4])[out] = StringVector::AddString(output.data[4], string_t(IcebergManifestEntryContentTypeToString(manifest_entry.content)));
-			FlatVector::GetData<string_t>(output.data[5])[out] = StringVector::AddString(output.data[5], string_t(manifest_entry.file_path));
-			FlatVector::GetData<string_t>(output.data[6])[out] = StringVector::AddString(output.data[6], string_t(manifest_entry.file_format));
+			FlatVector::GetData<string_t>(output.data[3])[out] = StringVector::AddString(
+			    output.data[3], string_t(IcebergManifestEntryStatusTypeToString(manifest_entry.status)));
+			FlatVector::GetData<string_t>(output.data[4])[out] = StringVector::AddString(
+			    output.data[4], string_t(IcebergManifestEntryContentTypeToString(manifest_entry.content)));
+			FlatVector::GetData<string_t>(output.data[5])[out] =
+			    StringVector::AddString(output.data[5], string_t(manifest_entry.file_path));
+			FlatVector::GetData<string_t>(output.data[6])[out] =
+			    StringVector::AddString(output.data[6], string_t(manifest_entry.file_format));
 			FlatVector::GetData<int64_t>(output.data[7])[out] = manifest_entry.record_count;
 			out++;
 		}
@@ -133,7 +142,7 @@ TableFunctionSet IcebergFunctions::GetIcebergMetadataFunction() {
 	TableFunctionSet function_set("iceberg_metadata");
 
 	auto fun = TableFunction({LogicalType::VARCHAR}, IcebergMetaDataFunction, IcebergMetaDataBind,
-	              IcebergMetaDataGlobalTableFunctionState::Init);
+	                         IcebergMetaDataGlobalTableFunctionState::Init);
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	function_set.AddFunction(fun);
 

@@ -4,8 +4,8 @@
 namespace duckdb {
 
 string IcebergUtils::FileToString(const string &path, FileSystem &fs) {
-	auto handle = fs.OpenFile(path, FileFlags::FILE_FLAGS_READ, FileSystem::DEFAULT_LOCK,
-	                          FileSystem::DEFAULT_COMPRESSION);
+	auto handle =
+	    fs.OpenFile(path, FileFlags::FILE_FLAGS_READ, FileSystem::DEFAULT_LOCK, FileSystem::DEFAULT_COMPRESSION);
 	auto file_size = handle->GetFileSize();
 	string ret_val(file_size, ' ');
 	handle->Read((char *)ret_val.c_str(), file_size);
@@ -42,5 +42,4 @@ string IcebergUtils::TryGetStrFromObject(yyjson_val *obj, string field) {
 	return yyjson_get_str(val);
 }
 
-
-}
+} // namespace duckdb
