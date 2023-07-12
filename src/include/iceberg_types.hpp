@@ -72,7 +72,7 @@ static string MANIFEST_SCHEMA = "{\n"
 
 //! An entry in the manifest list file (top level AVRO file)
 struct IcebergManifest {
-	explicit IcebergManifest(const c::manifest_file& schema) {
+	explicit IcebergManifest(const c::manifest_file &schema) {
 		manifest_path = schema.manifest_path;
 		sequence_number = schema.sequence_number;
 		content = (IcebergManifestContentType)schema.content;
@@ -98,11 +98,7 @@ struct IcebergManifest {
 	}
 
 	static vector<string> Names() {
-		return {
-		    "manifest_path",
-		    "manifest_sequence_number",
-		    "manifest_content"
-		};
+		return {"manifest_path", "manifest_sequence_number", "manifest_content"};
 	}
 };
 
@@ -128,7 +124,7 @@ static string MANIFEST_ENTRY_SCHEMA = "{\n"
 
 //! An entry in a manifest file
 struct IcebergManifestEntry {
-	explicit IcebergManifestEntry(const c::manifest_entry& schema) {
+	explicit IcebergManifestEntry(const c::manifest_entry &schema) {
 		status = (IcebergManifestEntryStatusType)schema.status;
 		content = (IcebergManifestEntryContentType)schema.data_file_.content;
 		file_path = schema.data_file_.file_path;
@@ -146,29 +142,19 @@ struct IcebergManifestEntry {
 
 	void Print() {
 		Printer::Print("    -> ManifestEntry = { type: " + IcebergManifestEntryStatusTypeToString(status) +
-		               ", content: " + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path + ", record_count: " + to_string(record_count) + "}");
+		               ", content: " + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path +
+		               ", record_count: " + to_string(record_count) + "}");
 	}
 
 	static vector<LogicalType> Types() {
-	    return {
-		    LogicalType::VARCHAR,
-		    LogicalType::VARCHAR,
-		    LogicalType::VARCHAR,
-		    LogicalType::VARCHAR,
-		    LogicalType::BIGINT,
+		return {
+		    LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::BIGINT,
 		};
 	}
 
 	static vector<string> Names() {
-	    return {
-		    "status",
-		    "content",
-		    "file_path",
-		    "file_format",
-		    "record_count"
-		};
+		return {"status", "content", "file_path", "file_format", "record_count"};
 	}
-
 };
 
 struct IcebergTableEntry {
@@ -182,4 +168,4 @@ struct IcebergTableEntry {
 		}
 	}
 };
-}
+} // namespace duckdb

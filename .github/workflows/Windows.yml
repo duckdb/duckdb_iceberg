@@ -16,7 +16,7 @@ jobs:
         # Add commits/tags to build against other DuckDB versions
         duckdb_version: [ '<submodule_version>' ]
         vcpkg_version: [ '2023.04.15' ]
-        vcpkg_triplet: ['x64-windows']
+        vcpkg_triplet: ['x64-windows-static-md']
     env:
       VCPKG_TARGET_TRIPLET: ${{ matrix.vcpkg_triplet }}
       GEN: Ninja
@@ -60,6 +60,11 @@ jobs:
           name: windows-extension
           path: |
             build/release/extension/iceberg/iceberg.duckdb_extension
+
+      - name: error log
+        if: always()
+        shell: bash
+        run: cat D:/a/duckdb_iceberg/duckdb_iceberg/vcpkg/buildtrees/avro-cpp/install-x64-windows-static-md-dbg-out.log
 
       - name: Deploy
         env:

@@ -1,8 +1,8 @@
 diff --git a/lang/c++/CMakeLists.txt b/lang/c++/CMakeLists.txt
-index 6098613ed..7ba0a8f08 100644
+index 6098613ed..e6f185fa1 100644
 --- a/lang/c++/CMakeLists.txt
 +++ b/lang/c++/CMakeLists.txt
-@@ -51,6 +51,8 @@ list(GET AVRO_VERSION 2 AVRO_VERSION_PATCH)
+@@ -51,15 +51,17 @@ list(GET AVRO_VERSION 2 AVRO_VERSION_PATCH)
  project (Avro-cpp)
  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR})
  
@@ -11,23 +11,52 @@ index 6098613ed..7ba0a8f08 100644
  if (WIN32 AND NOT CYGWIN AND NOT MSYS)
      add_definitions (/EHa)
      add_definitions (
-@@ -120,7 +122,7 @@ set_property (TARGET avrocpp
-     APPEND PROPERTY COMPILE_DEFINITIONS AVRO_DYN_LINK)
+         -DNOMINMAX
+-        -DBOOST_REGEX_DYN_LINK
+-        -DBOOST_FILESYSTEM_DYN_LINK
+-        -DBOOST_SYSTEM_DYN_LINK
+-        -DBOOST_IOSTREAMS_DYN_LINK
+-        -DBOOST_PROGRAM_OPTIONS_DYN_LINK
++#        -DBOOST_REGEX_DYN_LINK
++#        -DBOOST_FILESYSTEM_DYN_LINK
++#        -DBOOST_SYSTEM_DYN_LINK
++#        -DBOOST_IOSTREAMS_DYN_LINK
++#        -DBOOST_PROGRAM_OPTIONS_DYN_LINK
+         -DBOOST_ALL_NO_LIB)
+ endif()
+ 
+@@ -114,29 +116,29 @@ set (AVRO_SOURCE_FILES
+         impl/CustomFields.cc
+         )
+ 
+-add_library (avrocpp SHARED ${AVRO_SOURCE_FILES})
++# add_library (avrocpp SHARED ${AVRO_SOURCE_FILES})
+ 
+-set_property (TARGET avrocpp
+-    APPEND PROPERTY COMPILE_DEFINITIONS AVRO_DYN_LINK)
++#set_property (TARGET avrocpp
++#    APPEND PROPERTY COMPILE_DEFINITIONS AVRO_DYN_LINK)
  
  add_library (avrocpp_s STATIC ${AVRO_SOURCE_FILES})
 -target_include_directories(avrocpp_s PRIVATE ${SNAPPY_INCLUDE_DIR})
 +target_include_directories(avrocpp_s PRIVATE ${SNAPPY_INCLUDE_DIR} impl/json)
  
- set_property (TARGET avrocpp avrocpp_s
+-set_property (TARGET avrocpp avrocpp_s
++set_property (TARGET avrocpp_s
      APPEND PROPERTY COMPILE_DEFINITIONS AVRO_SOURCE)
-@@ -131,12 +133,12 @@ set_target_properties (avrocpp PROPERTIES
+ 
+-set_target_properties (avrocpp PROPERTIES
+-    VERSION ${AVRO_VERSION_MAJOR}.${AVRO_VERSION_MINOR}.${AVRO_VERSION_PATCH})
++#set_target_properties (avrocpp PROPERTIES
++#    VERSION ${AVRO_VERSION_MAJOR}.${AVRO_VERSION_MINOR}.${AVRO_VERSION_PATCH})
+ 
  set_target_properties (avrocpp_s PROPERTIES
      VERSION ${AVRO_VERSION_MAJOR}.${AVRO_VERSION_MINOR}.${AVRO_VERSION_PATCH})
  
 -target_link_libraries (avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES})
 -target_include_directories(avrocpp PRIVATE ${SNAPPY_INCLUDE_DIR})
-+target_link_libraries (avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES} ZLIB::ZLIB)
-+target_include_directories(avrocpp PRIVATE ${SNAPPY_INCLUDE_DIR} impl/json)
++#target_link_libraries (avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES} ZLIB::ZLIB)
++#target_include_directories(avrocpp PRIVATE ${SNAPPY_INCLUDE_DIR} impl/json)
  
  add_executable (precompile test/precompile.cc)
  
@@ -52,7 +81,7 @@ index 6098613ed..7ba0a8f08 100644
 -    add_executable (${name} test/${name}.cc)
 -    target_link_libraries (${name} avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES})
 +    add_executable (${name} test/${name}.cc impl/json/JsonIO.cc impl/json/JsonDom.cc)
-+    target_link_libraries (${name} avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES} ZLIB::ZLIB)
++#    target_link_libraries (${name} avrocpp ${Boost_LIBRARIES} ${SNAPPY_LIBRARIES} ZLIB::ZLIB)
      add_test (NAME ${name} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
          COMMAND ${CMAKE_CURRENT_BINARY_DIR}/${name})
  endmacro (unittest)
@@ -102,8 +131,12 @@ index 6098613ed..7ba0a8f08 100644
  
  include (InstallRequiredSystemLibraries)
  
-@@ -207,12 +213,14 @@ include (CPack)
- install (TARGETS avrocpp avrocpp_s
+@@ -204,15 +210,17 @@ set (CPACK_PACKAGE_FILE_NAME "avrocpp-${AVRO_VERSION_MAJOR}")
+ 
+ include (CPack)
+ 
+-install (TARGETS avrocpp avrocpp_s
++install (TARGETS avrocpp_s
      LIBRARY DESTINATION lib
      ARCHIVE DESTINATION lib
 -    RUNTIME DESTINATION lib)

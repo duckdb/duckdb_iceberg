@@ -43,14 +43,15 @@ protected:
 struct IcebergTable {
 public:
 	//! Loads all(!) metadata of into IcebergTable object
-	static IcebergTable Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs, bool allow_moved_paths = false);
+	static IcebergTable Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs,
+	                         bool allow_moved_paths = false);
 
 	//! Returns all paths to be scanned for the IcebergManifestContentType
-	template<IcebergManifestContentType TYPE>
+	template <IcebergManifestContentType TYPE>
 	vector<string> GetPaths() {
 		vector<string> ret;
 		for (auto &entry : entries) {
-			if(entry.manifest.content != TYPE) {
+			if (entry.manifest.content != TYPE) {
 				continue;
 			}
 			for (auto &manifest_entry : entry.manifest_entries) {

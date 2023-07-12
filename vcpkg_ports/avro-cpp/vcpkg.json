@@ -4,7 +4,6 @@
   "description": "Apache Avro is a data serialization system",
   "homepage": "https://github.com/apache/avro",
   "license": "Apache-2.0",
-  "supports": "!(windows & static)",
   "dependencies": [
     "boost-algorithm",
     "boost-any",

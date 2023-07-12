@@ -11,16 +11,21 @@
 
 namespace duckdb {
 
-IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs, bool allow_moved_paths) {
+IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs,
+                                bool allow_moved_paths) {
 	IcebergTable ret;
 	ret.path = iceberg_path;
 	ret.snapshot = snapshot;
 
-	auto manifest_list_full_path = allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, snapshot.manifest_list, fs) : snapshot.manifest_list;
+	auto manifest_list_full_path = allow_moved_paths
+	                                   ? IcebergUtils::GetFullPath(iceberg_path, snapshot.manifest_list, fs)
+	                                   : snapshot.manifest_list;
 	auto manifests = ReadManifestListFile(manifest_list_full_path, fs);
 
 	for (auto &manifest : manifests) {
-		auto manifest_entry_full_path = allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, manifest.manifest_path, fs) : manifest.manifest_path;
+		auto manifest_entry_full_path = allow_moved_paths
+		                                    ? IcebergUtils::GetFullPath(iceberg_path, manifest.manifest_path, fs)
+		                                    : manifest.manifest_path;
 		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs);
 
 		ret.entries.push_back({std::move(manifest), std::move(manifest_paths)});
@@ -35,7 +40,7 @@ vector<IcebergManifest> IcebergTable::ReadManifestListFile(string path, FileSyst
 	// TODO: make streaming
 	string file = IcebergUtils::FileToString(path, fs);
 
-	auto stream = avro::memoryInputStream((unsigned char*)file.c_str(), file.size());
+	auto stream = avro::memoryInputStream((unsigned char *)file.c_str(), file.size());
 	auto schema = avro::compileJsonSchemaFromString(MANIFEST_SCHEMA);
 	avro::DataFileReader<c::manifest_file> dfr(std::move(stream), schema);
 
@@ -52,7 +57,7 @@ vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(string path, File
 
 	// TODO: make streaming
 	string file = IcebergUtils::FileToString(path, fs);
-	auto stream = avro::memoryInputStream((unsigned char*)file.c_str(), file.size());
+	auto stream = avro::memoryInputStream((unsigned char *)file.c_str(), file.size());
 	auto schema = avro::compileJsonSchemaFromString(MANIFEST_ENTRY_SCHEMA);
 	avro::DataFileReader<c::manifest_entry> dfr(std::move(stream), schema);
 
@@ -180,7 +185,8 @@ yyjson_val *IcebergSnapshot::FindSnapshotByIdInternal(yyjson_val *snapshots, idx
 	return nullptr;
 }
 
-yyjson_val *IcebergSnapshot::IcebergSnapshot::FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp) {
+yyjson_val *IcebergSnapshot::IcebergSnapshot::FindSnapshotByIdTimestampInternal(yyjson_val *snapshots,
+                                                                                timestamp_t timestamp) {
 	size_t idx, max;
 	yyjson_val *snapshot;
 
@@ -201,4 +207,4 @@ yyjson_val *IcebergSnapshot::IcebergSnapshot::FindSnapshotByIdTimestampInternal(
 	return max_snapshot;
 }
 
-}
+} // namespace duckdb
