@@ -1,9 +1,10 @@
-Warning: This extension currently builds with a feature branch of DuckDB. A PR is being worked on. When the PR is merged,
+> **Disclaimer:** This extension is currently in an experimental state. Feel free to try it out, but be aware that minimal testing and
+benchmarking was done.
+
+> Warning: This extension currently builds with the master branch of DuckDB. A PR is being worked on. When the PR is merged,
 this extension will be updated and usable from (nightly) DuckDB releases.
 
 # DuckDB extension for Apache Iceberg 
-**Disclaimer:** This extension is currently in an experimental state. Feel free to try it out, but be aware that minimal testing and
-benchmarking was done.
 
 This repository contains a DuckDB extension that adds support for [Apache Iceberg](https://iceberg.apache.org/). In its current state, the extension offers some basics features that allow listing snapshots and reading specific snapshots
 of an iceberg tables.
