@@ -1,8 +1,8 @@
 diff --git a/lang/c++/CMakeLists.txt b/lang/c++/CMakeLists.txt
-index 6098613ed..cf257be43 100644
+index 6098613ed..e6f185fa1 100644
 --- a/lang/c++/CMakeLists.txt
 +++ b/lang/c++/CMakeLists.txt
-@@ -51,6 +51,8 @@ list(GET AVRO_VERSION 2 AVRO_VERSION_PATCH)
+@@ -51,15 +51,17 @@ list(GET AVRO_VERSION 2 AVRO_VERSION_PATCH)
  project (Avro-cpp)
  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR})
  
@@ -11,6 +11,20 @@ index 6098613ed..cf257be43 100644
  if (WIN32 AND NOT CYGWIN AND NOT MSYS)
      add_definitions (/EHa)
      add_definitions (
+         -DNOMINMAX
+-        -DBOOST_REGEX_DYN_LINK
+-        -DBOOST_FILESYSTEM_DYN_LINK
+-        -DBOOST_SYSTEM_DYN_LINK
+-        -DBOOST_IOSTREAMS_DYN_LINK
+-        -DBOOST_PROGRAM_OPTIONS_DYN_LINK
++#        -DBOOST_REGEX_DYN_LINK
++#        -DBOOST_FILESYSTEM_DYN_LINK
++#        -DBOOST_SYSTEM_DYN_LINK
++#        -DBOOST_IOSTREAMS_DYN_LINK
++#        -DBOOST_PROGRAM_OPTIONS_DYN_LINK
+         -DBOOST_ALL_NO_LIB)
+ endif()
+ 
 @@ -114,29 +116,29 @@ set (AVRO_SOURCE_FILES
          impl/CustomFields.cc
          )
