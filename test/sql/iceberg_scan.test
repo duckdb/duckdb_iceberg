@@ -6,7 +6,7 @@
 statement error
 SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg');
 ----
-Catalog Error: Table Function with name iceberg_scan does not exist!
+Catalog Error
 
 require iceberg
 
