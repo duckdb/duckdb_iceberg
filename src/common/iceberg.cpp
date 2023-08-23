@@ -138,7 +138,7 @@ IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot) {
 
 idx_t IcebergSnapshot::GetTableVersion(string &path, FileSystem &fs) {
 	auto meta_path = fs.JoinPath(path, "metadata");
-	auto version_file_path = FileSystem::JoinPath(meta_path, "version-hint.text");
+	auto version_file_path = fs.JoinPath(meta_path, "version-hint.text");
 	auto version_file_content = IcebergUtils::FileToString(version_file_path, fs);
 
 	try {
