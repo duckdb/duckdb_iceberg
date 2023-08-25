@@ -75,9 +75,9 @@ target_link_libraries(
 
 # Link dependencies into extension
 target_link_libraries(${EXTENSION_NAME} PUBLIC optimized avro_static_release
-                                               debug avro_static_release)
+                                               debug avro_static_debug)
 target_link_libraries(${TARGET_NAME}_loadable_extension optimized
-                      avro_static_release debug avro_static_release)
+                      avro_static_release debug avro_static_debug)
 
 install(
   TARGETS ${EXTENSION_NAME} ${TARGET_NAME}_loadable_extension
