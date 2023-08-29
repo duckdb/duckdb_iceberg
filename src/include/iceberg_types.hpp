@@ -8,13 +8,10 @@
 
 #pragma once
 
-// Note: The `_full` headers here provide the c++ classed for the full iceberg schema, I'm predicting this will
-// inevitably be necessary when the iceberg tables snowflake spits out have slightly different schema's.
-// TODO: can be removed when snowflake tests have succeeded
 #include "avro_codegen/iceberg_manifest_entry_partial.hpp"
+#include "avro_codegen/iceberg_manifest_entry_partial_v1.hpp"
 #include "avro_codegen/iceberg_manifest_file_partial.hpp"
-//#include "avro_codegen/iceberg_manifest_entry_full.hpp"
-//#include "avro_codegen/iceberg_manifest_file_full.hpp"
+#include "avro_codegen/iceberg_manifest_file_partial_v1.hpp"
 
 namespace duckdb {
 
@@ -70,13 +67,31 @@ static string MANIFEST_SCHEMA = "{\n"
                                 "     ]\n"
                                 " }";
 
+// Schema for v1, sequence_number and content are not present there
+static string MANIFEST_SCHEMA_V1 = "{\n"
+                                "     \"type\": \"record\",\n"
+                                "     \"name\": \"manifest_file\",\n"
+                                "     \"fields\" : [\n"
+                                "         {\"name\": \"manifest_path\", \"type\": \"string\"}\n"
+                                "     ]\n"
+                                " }";
+
 //! An entry in the manifest list file (top level AVRO file)
 struct IcebergManifest {
+	//! Constructor from iceberg v2 spec manifest file
 	explicit IcebergManifest(const c::manifest_file &schema) {
 		manifest_path = schema.manifest_path;
 		sequence_number = schema.sequence_number;
 		content = (IcebergManifestContentType)schema.content;
 	}
+
+	//! Constructor from iceberg v1 spec manifest file
+	explicit IcebergManifest(const c::manifest_file_v1 &schema) {
+		manifest_path = schema.manifest_path;
+		sequence_number = 0;
+		content = IcebergManifestContentType::DATA;
+	}
+
 	//! Path to the manifest AVRO file
 	string manifest_path;
 	//! sequence_number when manifest was added to table (0 for Iceberg v1)
@@ -122,11 +137,37 @@ static string MANIFEST_ENTRY_SCHEMA = "{\n"
                                       "     ]\n"
                                       " }";
 
+static string MANIFEST_ENTRY_SCHEMA_V1 = "{\n"
+                                      "     \"type\": \"record\",\n"
+                                      "     \"name\": \"manifest_entry\",\n"
+                                      "     \"fields\" : [\n"
+                                      "         {\"name\": \"status\", \"type\" : \"int\"},\n"
+                                      "         {\"name\": \"data_file\", \"type\": {\n"
+                                      "             \"type\": \"record\",\n"
+                                      "             \"name\": \"r2\",\n"
+                                      "             \"fields\" : [\n"
+                                      "                 {\"name\": \"file_path\", \"type\": \"string\"},\n"
+                                      "                 {\"name\": \"file_format\", \"type\": \"string\"},\n"
+                                      "                 {\"name\": \"record_count\", \"type\" : \"long\"}\n"
+                                      "           ]}\n"
+                                      "         }\n"
+                                      "     ]\n"
+                                      " }";
+
+
 //! An entry in a manifest file
 struct IcebergManifestEntry {
 	explicit IcebergManifestEntry(const c::manifest_entry &schema) {
 		status = (IcebergManifestEntryStatusType)schema.status;
 		content = (IcebergManifestEntryContentType)schema.data_file_.content;
+		file_path = schema.data_file_.file_path;
+		file_format = schema.data_file_.file_format;
+		record_count = schema.data_file_.record_count;
+	}
+
+	explicit IcebergManifestEntry(const c::manifest_entry_v1 &schema) {
+		status = (IcebergManifestEntryStatusType)schema.status;
+		content = IcebergManifestEntryContentType::DATA;
 		file_path = schema.data_file_.file_path;
 		file_format = schema.data_file_.file_format;
 		record_count = schema.data_file_.record_count;

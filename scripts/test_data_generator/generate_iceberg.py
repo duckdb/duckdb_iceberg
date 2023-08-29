@@ -7,12 +7,14 @@ import os
 from pyspark import SparkContext
 from pathlib import Path
 
-if (len(sys.argv) != 3):
-    print("Usage: generate_iceberg.py <SCALE_FACTOR> <DEST_PATH>")
+if (len(sys.argv) != 4 ):
+    print("Usage: generate_iceberg.py <SCALE_FACTOR> <DEST_PATH> <ICBERG_SPEC_VERSION>")
     exit(1)
 
 SCALE = sys.argv[1]
 DEST_PATH = sys.argv[2]
+ICEBERG_SPEC_VERSION = sys.argv[3]
+
 PARQUET_SRC_FILE = f'{DEST_PATH}/base_file/file.parquet'
 TABLE_NAME = "iceberg_catalog.pyspark_iceberg_table";
 CWD = os.getcwd()
@@ -43,17 +45,24 @@ sc.setLogLevel("ERROR")
 ### Create Iceberg table from dataset
 ###
 spark.read.parquet(PARQUET_SRC_FILE).createOrReplaceTempView('parquet_file_view');
-spark.sql(f"CREATE or REPLACE TABLE {TABLE_NAME} TBLPROPERTIES ('format-version'='2', 'write.update.mode'='merge-on-read') AS SELECT * FROM parquet_file_view");
+
+if ICEBERG_SPEC_VERSION == '1':
+    spark.sql(f"CREATE or REPLACE TABLE {TABLE_NAME} TBLPROPERTIES ('format-version'='{ICEBERG_SPEC_VERSION}') AS SELECT * FROM parquet_file_view");
+elif ICEBERG_SPEC_VERSION == '2':
+    spark.sql(f"CREATE or REPLACE TABLE {TABLE_NAME} TBLPROPERTIES ('format-version'='{ICEBERG_SPEC_VERSION}', 'write.update.mode'='merge-on-read') AS SELECT * FROM parquet_file_view");
+else:
+    print(f"Are you from the future? Iceberg spec version '{ICEBERG_SPEC_VERSION}' is unbeknownst to me")
+    exit(1)
 
 ###
 ### Apply modifications to base table generating verification results between each step
 ###
-update_files = [str(path) for path in Path(f'{SCRIPT_DIR}').rglob('*.sql')]
+update_files = [str(path) for path in Path(f'{SCRIPT_DIR}/updates_v{ICEBERG_SPEC_VERSION}').rglob('*.sql')]
 update_files.sort() # Order matters obviously
 last_file = ""
 
 for path in update_files:
-    full_file_path = f"{SCRIPT_DIR}/updates/{os.path.basename(path)}"
+    full_file_path = f"{SCRIPT_DIR}/updates_v{ICEBERG_SPEC_VERSION}/{os.path.basename(path)}"
     with open(full_file_path, 'r') as file:
         file_trimmed = os.path.basename(path)[:-4]
         last_file = file_trimmed

@@ -29,6 +29,7 @@ public:
 		global_state->metadata_doc =
 		    yyjson_read(global_state->metadata_file.c_str(), global_state->metadata_file.size(), 0);
 		auto root = yyjson_doc_get_root(global_state->metadata_doc);
+		global_state->iceberg_format_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 		auto snapshots = yyjson_obj_get(root, "snapshots");
 		yyjson_arr_iter_init(snapshots, &global_state->snapshot_it);
 		return global_state;
@@ -37,6 +38,7 @@ public:
 	string metadata_file;
 	yyjson_doc *metadata_doc;
 	yyjson_arr_iter snapshot_it;
+	idx_t iceberg_format_version;
 };
 
 static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, TableFunctionBindInput &input,
@@ -69,7 +71,8 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 		if (i >= STANDARD_VECTOR_SIZE) {
 			break;
 		}
-		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot);
+
+		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot, global_state.iceberg_format_version);
 
 		FlatVector::GetData<int64_t>(output.data[0])[i] = snapshot.sequence_number;
 		FlatVector::GetData<int64_t>(output.data[1])[i] = snapshot.snapshot_id;

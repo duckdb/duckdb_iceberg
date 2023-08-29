@@ -30,9 +30,9 @@ SELECT count(*) FROM ICEBERG_SCAN('s3://test-bucket-public/iceberg_0_01/pyspark_
 
 # Check data is identical, sorting by uuid to guarantee unique order
 query I nosort q1
-SELECT * FROM ICEBERG_SCAN('s3://test-bucket-public/iceberg_0_01/pyspark_iceberg_table', ALLOW_MOVED_PATHS=TRUE) ORDER BY uuid NULLS LAST;
+SELECT * FROM ICEBERG_SCAN('s3://test-bucket-public/iceberg_0_01/pyspark_iceberg_table', ALLOW_MOVED_PATHS=TRUE) ORDER BY uuid;
 ----
 
 query I nosort q1
-SELECT * FROM PARQUET_SCAN('data/iceberg/generated_0_01/expected_results/last/data/*.parquet') ORDER BY uuid NULLS LAST;
+SELECT * FROM PARQUET_SCAN('data/iceberg/generated_0_01/expected_results/last/data/*.parquet') ORDER BY uuid;
 ----

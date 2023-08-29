@@ -20,13 +20,13 @@ IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &sna
 	auto manifest_list_full_path = allow_moved_paths
 	                                   ? IcebergUtils::GetFullPath(iceberg_path, snapshot.manifest_list, fs)
 	                                   : snapshot.manifest_list;
-	auto manifests = ReadManifestListFile(manifest_list_full_path, fs);
+	auto manifests = ReadManifestListFile(manifest_list_full_path, fs, snapshot.iceberg_format_version);
 
 	for (auto &manifest : manifests) {
 		auto manifest_entry_full_path = allow_moved_paths
 		                                    ? IcebergUtils::GetFullPath(iceberg_path, manifest.manifest_path, fs)
 		                                    : manifest.manifest_path;
-		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs);
+		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs, snapshot.iceberg_format_version);
 
 		ret.entries.push_back({std::move(manifest), std::move(manifest_paths)});
 	}
@@ -34,36 +34,55 @@ IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &sna
 	return ret;
 }
 
-vector<IcebergManifest> IcebergTable::ReadManifestListFile(string path, FileSystem &fs) {
+vector<IcebergManifest> IcebergTable::ReadManifestListFile(string path, FileSystem &fs, idx_t iceberg_format_version) {
 	vector<IcebergManifest> ret;
 
 	// TODO: make streaming
 	string file = IcebergUtils::FileToString(path, fs);
 
 	auto stream = avro::memoryInputStream((unsigned char *)file.c_str(), file.size());
-	auto schema = avro::compileJsonSchemaFromString(MANIFEST_SCHEMA);
-	avro::DataFileReader<c::manifest_file> dfr(std::move(stream), schema);
+	avro::ValidSchema schema;
 
-	c::manifest_file manifest_list;
-	while (dfr.read(manifest_list)) {
-		ret.emplace_back(IcebergManifest(manifest_list));
+	if (iceberg_format_version == 1) {
+		schema = avro::compileJsonSchemaFromString(MANIFEST_SCHEMA_V1);
+		avro::DataFileReader<c::manifest_file_v1> dfr(std::move(stream), schema);
+		c::manifest_file_v1 manifest_list;
+		while (dfr.read(manifest_list)) {
+			ret.emplace_back(IcebergManifest(manifest_list));
+		}
+	} else {
+		schema = avro::compileJsonSchemaFromString(MANIFEST_SCHEMA);
+		avro::DataFileReader<c::manifest_file> dfr(std::move(stream), schema);
+		c::manifest_file manifest_list;
+		while (dfr.read(manifest_list)) {
+			ret.emplace_back(IcebergManifest(manifest_list));
+		}
 	}
 
 	return ret;
 }
 
-vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(string path, FileSystem &fs) {
+vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(string path, FileSystem &fs, idx_t iceberg_format_version) {
 	vector<IcebergManifestEntry> ret;
 
 	// TODO: make streaming
 	string file = IcebergUtils::FileToString(path, fs);
 	auto stream = avro::memoryInputStream((unsigned char *)file.c_str(), file.size());
-	auto schema = avro::compileJsonSchemaFromString(MANIFEST_ENTRY_SCHEMA);
-	avro::DataFileReader<c::manifest_entry> dfr(std::move(stream), schema);
 
-	c::manifest_entry manifest_entry;
-	while (dfr.read(manifest_entry)) {
-		ret.emplace_back(IcebergManifestEntry(manifest_entry));
+	if (iceberg_format_version == 1) {
+		auto schema = avro::compileJsonSchemaFromString(MANIFEST_ENTRY_SCHEMA_V1);
+		avro::DataFileReader<c::manifest_entry_v1> dfr(std::move(stream), schema);
+		c::manifest_entry_v1 manifest_entry;
+		while (dfr.read(manifest_entry)) {
+			ret.emplace_back(IcebergManifestEntry(manifest_entry));
+		}
+	} else {
+		auto schema = avro::compileJsonSchemaFromString(MANIFEST_ENTRY_SCHEMA);
+		avro::DataFileReader<c::manifest_entry> dfr(std::move(stream), schema);
+		c::manifest_entry manifest_entry;
+		while (dfr.read(manifest_entry)) {
+			ret.emplace_back(IcebergManifestEntry(manifest_entry));
+		}
 	}
 
 	return ret;
@@ -73,6 +92,7 @@ IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(string &path, FileSystem &fs)
 	auto metadata_json = ReadMetaData(path, fs);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto root = yyjson_doc_get_root(doc);
+	auto iceberg_format_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 	auto snapshots = yyjson_obj_get(root, "snapshots");
 	auto latest_snapshot = FindLatestSnapshotInternal(snapshots);
 
@@ -80,13 +100,14 @@ IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(string &path, FileSystem &fs)
 		throw IOException("No snapshots found");
 	}
 
-	return ParseSnapShot(latest_snapshot);
+	return ParseSnapShot(latest_snapshot, iceberg_format_version);
 }
 
 IcebergSnapshot IcebergSnapshot::GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id) {
 	auto metadata_json = ReadMetaData(path, fs);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto root = yyjson_doc_get_root(doc);
+	auto iceberg_format_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 	auto snapshots = yyjson_obj_get(root, "snapshots");
 	auto snapshot = FindSnapshotByIdInternal(snapshots, snapshot_id);
 
@@ -94,13 +115,14 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotById(string &path, FileSystem &fs, i
 		throw IOException("Could not find snapshot with id " + to_string(snapshot_id));
 	}
 
-	return ParseSnapShot(snapshot);
+	return ParseSnapShot(snapshot, iceberg_format_version);
 }
 
 IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp) {
 	auto metadata_json = ReadMetaData(path, fs);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto root = yyjson_doc_get_root(doc);
+	auto iceberg_format_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 	auto snapshots = yyjson_obj_get(root, "snapshots");
 	auto snapshot = FindSnapshotByIdTimestampInternal(snapshots, timestamp);
 
@@ -108,7 +130,7 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(string &path, FileSystem
 		throw IOException("Could not find latest snapshots for timestamp " + Timestamp::ToString(timestamp));
 	}
 
-	return ParseSnapShot(snapshot);
+	return ParseSnapShot(snapshot, iceberg_format_version);
 }
 
 string IcebergSnapshot::ReadMetaData(string &path, FileSystem &fs) {
@@ -120,18 +142,23 @@ string IcebergSnapshot::ReadMetaData(string &path, FileSystem &fs) {
 	return IcebergUtils::FileToString(metadata_file_path, fs);
 }
 
-IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot) {
+IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version) {
 	IcebergSnapshot ret;
-
 	auto snapshot_tag = yyjson_get_tag(snapshot);
 	if (snapshot_tag != YYJSON_TYPE_OBJ) {
 		throw IOException("Invalid snapshot field found parsing iceberg metadata.json");
 	}
 
+	if (iceberg_format_version == 1) {
+		ret.sequence_number = 0;
+	} else if (iceberg_format_version == 2) {
+		ret.sequence_number = IcebergUtils::TryGetNumFromObject(snapshot, "sequence-number");
+	}
+
 	ret.snapshot_id = IcebergUtils::TryGetNumFromObject(snapshot, "snapshot-id");
-	ret.sequence_number = IcebergUtils::TryGetNumFromObject(snapshot, "sequence-number");
 	ret.timestamp_ms = Timestamp::FromEpochMs(IcebergUtils::TryGetNumFromObject(snapshot, "timestamp-ms"));
 	ret.manifest_list = IcebergUtils::TryGetStrFromObject(snapshot, "manifest-list");
+	ret.iceberg_format_version = iceberg_format_version;
 
 	return ret;
 }

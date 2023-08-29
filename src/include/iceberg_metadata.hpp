@@ -22,12 +22,13 @@ public:
 	uint64_t sequence_number;
 	string manifest_list;
 	timestamp_t timestamp_ms;
+	idx_t iceberg_format_version;
 
 	static IcebergSnapshot GetLatestSnapshot(string &path, FileSystem &fs);
 	static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id);
 	static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp);
 
-	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot);
+	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version);
 	static string ReadMetaData(string &path, FileSystem &fs);
 
 protected:
@@ -76,9 +77,8 @@ public:
 	vector<IcebergTableEntry> entries;
 
 protected:
-	static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs);
-	static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs);
-
+	static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs, idx_t iceberg_format_version);
+	static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs, idx_t iceberg_format_version);
 	string path;
 };
 
