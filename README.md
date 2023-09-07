@@ -24,7 +24,7 @@ based on pyspark 3.4, which you can install through pip.
 To build the extension with vcpkg, you can build this extension using:
 
 ```shell
-VCPKG_TOOLCHAIN_PATH='<path_to_your_vcpkg_toolchain>' make
+VCPKG_TOOLCHAIN_PATH='<path_to_your_vcpkg_repo>/scripts/buildsystems/vcpkg.cmake' make
 ```
 
 This will build both the separate loadable extension and a duckdb binary with the extension pre-loaded:
