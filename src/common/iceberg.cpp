@@ -94,6 +94,7 @@ IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(string &path, FileSystem &fs)
 	auto root = yyjson_doc_get_root(doc);
 	auto iceberg_format_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 	auto snapshots = yyjson_obj_get(root, "snapshots");
+	//auto schemas = yyjson_obj_get(root, "schemas");
 	auto latest_snapshot = FindLatestSnapshotInternal(snapshots);
 
 	if (!latest_snapshot) {
