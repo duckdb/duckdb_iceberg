@@ -14,6 +14,22 @@
 
 namespace duckdb {
 
+struct IcebergColumnDefinition {
+public:
+	static IcebergColumnDefinition ParseFromJson(yyjson_val* val);
+
+	LogicalType ToDuckDBType() {
+		return type;
+	}
+
+	int32_t id;
+	string name;
+	LogicalType type;
+	Value default_value;
+	bool required;
+};
+
+
 //! An Iceberg snapshot https://iceberg.apache.org/spec/#snapshots
 class IcebergSnapshot {
 public:
@@ -23,13 +39,16 @@ public:
 	string manifest_list;
 	timestamp_t timestamp_ms;
 	idx_t iceberg_format_version;
+	uint64_t schema_id;
+	vector<IcebergColumnDefinition> schema;
 
 	static IcebergSnapshot GetLatestSnapshot(string &path, FileSystem &fs);
 	static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id);
 	static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp);
 
-	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version);
+	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, yyjson_val* schemas);
 	static string ReadMetaData(string &path, FileSystem &fs);
+	static yyjson_val * GetSnapshots(string &path, FileSystem &fs);
 
 protected:
 	//! Internal JSON parsing functions
@@ -37,7 +56,7 @@ protected:
 	static yyjson_val *FindLatestSnapshotInternal(yyjson_val *snapshots);
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);
-	static case_insensitive_map_t<LogicalType> ParseSchema(yyjson_val *schemas);
+	static vector<IcebergColumnDefinition> ParseSchema(yyjson_val *schemas, idx_t schema_id);
 };
 
 //! Represents the iceberg table at a specific IcebergSnapshot. Corresponds to a single Manifest List.
@@ -81,21 +100,6 @@ protected:
 	static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs, idx_t iceberg_format_version);
 	static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs, idx_t iceberg_format_version);
 	string path;
-};
-
-class IcebergUtils {
-public:
-	//! Downloads a file fully into a string
-	static string FileToString(const string &path, FileSystem &fs);
-
-	//! Somewhat hacky function that allows relative paths in iceberg tables to be resolved,
-	//! used for the allow_moved_paths debug option which allows us to test with iceberg tables that
-	//! were moved without their paths updated
-	static string GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs);
-
-	//! YYJSON utility functions
-	static uint64_t TryGetNumFromObject(yyjson_val *obj, string field);
-	static string TryGetStrFromObject(yyjson_val *obj, string field);
 };
 
 } // namespace duckdb

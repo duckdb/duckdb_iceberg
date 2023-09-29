@@ -1,4 +1,5 @@
 #include "iceberg_metadata.hpp"
+#include "iceberg_utils.hpp"
 
 namespace duckdb {
 
@@ -124,7 +125,7 @@ static LogicalType ParseType(yyjson_val *type) {
 		D_ASSERT(type_str.back() == ')');
 		auto start = type_str.find('(');
 		auto end = type_str.rfind(')');
-		auto raw_digits = type_str.substr(start, end - start);
+		auto raw_digits = type_str.substr(start+1, end - start);
 		auto digits = StringUtil::Split(raw_digits, ',');
 		D_ASSERT(digits.size() == 2);
 
@@ -135,29 +136,50 @@ static LogicalType ParseType(yyjson_val *type) {
 	throw IOException("Encountered an unrecognized type in JSON schema: \"%s\"", type_str);
 }
 
-static void PopulateFromSchema(case_insensitive_map_t<LogicalType> &map, yyjson_val *schema) {
+IcebergColumnDefinition IcebergColumnDefinition::ParseFromJson(yyjson_val* val) {
+	IcebergColumnDefinition ret;
+
+	ret.id = IcebergUtils::TryGetNumFromObject(val, "id");
+	ret.name = IcebergUtils::TryGetStrFromObject(val, "name");
+	ret.type = ParseType(val);
+	ret.default_value = Value();
+	ret.required = IcebergUtils::TryGetBoolFromObject(val, "required");
+
+	return ret;
+}
+
+static vector<IcebergColumnDefinition> ParseSchemaFromJson(yyjson_val *schema_json) {
 	// Assert that the top level 'type' is a struct
-	auto type_str = IcebergUtils::TryGetStrFromObject(schema, "type");
+	auto type_str = IcebergUtils::TryGetStrFromObject(schema_json, "type");
 	if (type_str != "struct") {
 		throw IOException("Schema in JSON Metadata is invalid");
 	}
-	auto schema_struct = ParseStruct(schema);
-	auto &columns = StructType::GetChildTypes(schema_struct);
-	for (auto &col : columns) {
-		auto &name = col.first;
-		auto &type = col.second;
-		map[name] = type;
+	D_ASSERT(yyjson_get_tag(schema_json) == YYJSON_TYPE_OBJ);
+	D_ASSERT(IcebergUtils::TryGetStrFromObject(schema_json, "type") == "struct");
+	yyjson_val *field;
+	size_t max, idx;
+	vector<IcebergColumnDefinition> ret;
+
+	auto fields = yyjson_obj_get(schema_json, "fields");
+	yyjson_arr_foreach(fields, idx, max, field) {
+		ret.push_back(IcebergColumnDefinition::ParseFromJson(field));
 	}
+
+	return ret;
 }
 
-case_insensitive_map_t<LogicalType> IcebergSnapshot::ParseSchema(yyjson_val *schemas) {
-	case_insensitive_map_t<LogicalType> columns;
+vector<IcebergColumnDefinition> IcebergSnapshot::ParseSchema(yyjson_val *schemas, idx_t schema_id) {
 	size_t idx, max;
 	yyjson_val *schema;
 	// Multiple schemas can be present in the json metadata 'schemas' list
 	yyjson_arr_foreach(schemas, idx, max, schema) {
-		PopulateFromSchema(columns, schema);
+		auto found_schema_id = IcebergUtils::TryGetNumFromObject(schema, "schema-id");
+		if (found_schema_id == schema_id) {
+			return ParseSchemaFromJson(schema);
+		}
 	}
+
+	throw IOException("Iceberg schema with schema id " + to_string(schema_id) + " was not found!");
 }
 
 } //namespace duckdb

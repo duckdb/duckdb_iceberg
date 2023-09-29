@@ -34,6 +34,14 @@ uint64_t IcebergUtils::TryGetNumFromObject(yyjson_val *obj, string field) {
 	return yyjson_get_uint(val);
 }
 
+bool IcebergUtils::TryGetBoolFromObject(yyjson_val *obj, string field) {
+	auto val = yyjson_obj_getn(obj, field.c_str(), field.size());
+	if (!val || yyjson_get_tag(val) != YYJSON_TYPE_BOOL) {
+		throw IOException("Invalid field found while parsing field: " + field);
+	}
+	return yyjson_get_bool(val);
+}
+
 string IcebergUtils::TryGetStrFromObject(yyjson_val *obj, string field) {
 	auto val = yyjson_obj_getn(obj, field.c_str(), field.size());
 	if (!val || yyjson_get_tag(val) != YYJSON_TYPE_STR) {
