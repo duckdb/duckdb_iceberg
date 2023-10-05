@@ -46,10 +46,7 @@ if (MODE.lower() == "spark"):
                     l_commitdate::TIMESTAMPTZ as l_commitdate_timestamp_tz,
                     l_comment as l_comment_string,
                     gen_random_uuid()::VARCHAR as uuid,
-                    l_comment::BLOB as l_comment_blob,
-                    {'a': l_shipmode, 'b': l_quantity} as l_shipmode_quantity_struct,
-                    [l_linenumber, l_quantity] as l_linenumber_quantity_list,
-                    map(['linenumber', 'quantity'], [l_linenumber, l_quantity]) as l_linenumber_quantity_map
+                    l_comment::BLOB as l_comment_blob
                     FROM
                     lineitem;""");
 elif (MODE.lower() == "default"):
@@ -70,10 +67,7 @@ elif (MODE.lower() == "default"):
                     l_commitdate::TIMESTAMPTZ as l_commitdate_timestamp_tz,
                     l_comment as l_comment_string,
                     gen_random_uuid()::UUID as uuid,
-                    l_comment::BLOB as l_comment_blob,
-                    {'a': l_shipmode, 'b': l_quantity} as l_shipmode_quantity_struct,
-                    [l_linenumber, l_quantity] as l_linenumber_quantity_list,
-                    map(['linenumber', 'quantity'], [l_linenumber, l_quantity]) as l_linenumber_quantity_map
+                    l_comment::BLOB as l_comment_blob
                     FROM
                     lineitem;""");
 else:
