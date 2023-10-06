@@ -223,29 +223,24 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	}
 }
 
-static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFunctionBindInput &input,
-                                                vector<LogicalType> &return_types, vector<string> &names) {
-	return nullptr;
-}
-
 TableFunctionSet IcebergFunctions::GetIcebergScanFunction() {
 	TableFunctionSet function_set("iceberg_scan");
 
 	auto fun =
-	    TableFunction({LogicalType::VARCHAR}, nullptr, IcebergScanBind, IcebergScanGlobalTableFunctionState::Init);
+	    TableFunction({LogicalType::VARCHAR}, nullptr, nullptr, IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
 	function_set.AddFunction(fun);
 
-	fun = TableFunction({LogicalType::VARCHAR, LogicalType::UBIGINT}, nullptr, IcebergScanBind,
+	fun = TableFunction({LogicalType::VARCHAR, LogicalType::UBIGINT}, nullptr, nullptr,
 	                    IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
 	function_set.AddFunction(fun);
 
-	fun = TableFunction({LogicalType::VARCHAR, LogicalType::TIMESTAMP}, nullptr, IcebergScanBind,
+	fun = TableFunction({LogicalType::VARCHAR, LogicalType::TIMESTAMP}, nullptr, nullptr,
 	                    IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
