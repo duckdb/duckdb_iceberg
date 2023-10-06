@@ -30,6 +30,10 @@ SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_ta
 ----
 
 query I nosort q1
+SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table/metadata/v6.metadata.json') ORDER BY uuid;
+----
+
+query I nosort q1
 SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec1_0_01/expected_results/q05/data/*.parquet') ORDER BY uuid;
 ----
 
@@ -50,6 +54,11 @@ SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_ice
 # Check data is identical, sorting by uuid to guarantee unique order
 query I nosort q2
 SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_table') ORDER BY uuid;
+----
+
+# Check data is identical, sorting by uuid to guarantee unique order
+query I nosort q2
+SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_table/metadata/v6.metadata.json') ORDER BY uuid;
 ----
 
 query I nosort q2
