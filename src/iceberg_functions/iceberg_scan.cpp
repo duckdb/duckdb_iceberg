@@ -178,6 +178,9 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 		auto loption = StringUtil::Lower(kv.first);
 		if (loption == "allow_moved_paths") {
 			allow_moved_paths = BooleanValue::Get(kv.second);
+			if (StringUtil::EndsWith(iceberg_path, ".json")) {
+				throw InvalidInputException("Enabling allow_moved_paths is not enabled for directly scanning metadata files.");
+			}
 		} else if (loption == "mode") {
 			mode = StringValue::Get(kv.second);
 		}

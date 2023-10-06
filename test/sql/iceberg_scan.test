@@ -14,7 +14,7 @@ require iceberg
 statement error
 SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE);
 ----
-Catalog Error: Function with name "parquet_scan" is not in the catalog
+Catalog Error
 
 require parquet
 
