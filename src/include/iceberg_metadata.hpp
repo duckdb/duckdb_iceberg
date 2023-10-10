@@ -52,7 +52,7 @@ public:
 
 protected:
 	//! Internal JSON parsing functions
-	static idx_t GetTableVersion(string &path, FileSystem &fs);
+	static string GetTableVersion(string &path, FileSystem &fs);
 	static yyjson_val *FindLatestSnapshotInternal(yyjson_val *snapshots);
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);
