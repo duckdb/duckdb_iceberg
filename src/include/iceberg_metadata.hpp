@@ -46,7 +46,7 @@ public:
 	static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id);
 	static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp);
 
-	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, yyjson_val* schemas);
+	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id, yyjson_val* schemas);
 	static string ReadMetaData(string &path, FileSystem &fs);
 	static yyjson_val * GetSnapshots(string &path, FileSystem &fs);
 

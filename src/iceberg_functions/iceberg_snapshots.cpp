@@ -75,7 +75,8 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 
 		auto root = yyjson_doc_get_root(global_state.metadata_doc);
 		auto schemas = yyjson_obj_get(root, "schemas");
-		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot, global_state.iceberg_format_version, schemas);
+		auto schema_id = IcebergUtils::TryGetNumFromObject(root, "current-schema-id");
+		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot, global_state.iceberg_format_version, schema_id, schemas);
 
 		FlatVector::GetData<int64_t>(output.data[0])[i] = snapshot.sequence_number;
 		FlatVector::GetData<int64_t>(output.data[1])[i] = snapshot.snapshot_id;

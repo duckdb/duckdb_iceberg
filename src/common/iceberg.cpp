@@ -96,6 +96,7 @@ IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(string &path, FileSystem &fs)
 	auto iceberg_format_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 	auto snapshots = yyjson_obj_get(root, "snapshots");
 	auto schemas = yyjson_obj_get(root, "schemas");
+	auto schema_id = IcebergUtils::TryGetNumFromObject(root, "current-schema-id");
 
 	auto latest_snapshot = FindLatestSnapshotInternal(snapshots);
 
@@ -103,7 +104,7 @@ IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(string &path, FileSystem &fs)
 		throw IOException("No snapshots found");
 	}
 
-	return ParseSnapShot(latest_snapshot, iceberg_format_version, schemas);
+	return ParseSnapShot(latest_snapshot, iceberg_format_version, schema_id, schemas);
 }
 
 IcebergSnapshot IcebergSnapshot::GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id) {
@@ -113,13 +114,14 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotById(string &path, FileSystem &fs, i
 	auto iceberg_format_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 	auto snapshots = yyjson_obj_get(root, "snapshots");
 	auto schemas = yyjson_obj_get(root, "schemas");
+	auto schema_id = IcebergUtils::TryGetNumFromObject(root, "current-schema-id");
 	auto snapshot = FindSnapshotByIdInternal(snapshots, snapshot_id);
 
 	if (!snapshot) {
 		throw IOException("Could not find snapshot with id " + to_string(snapshot_id));
 	}
 
-	return ParseSnapShot(snapshot, iceberg_format_version, schemas);
+	return ParseSnapShot(snapshot, iceberg_format_version, schema_id, schemas);
 }
 
 IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp) {
@@ -129,13 +131,14 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(string &path, FileSystem
 	auto iceberg_format_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 	auto snapshots = yyjson_obj_get(root, "snapshots");
 	auto schemas = yyjson_obj_get(root, "schemas");
+	auto schema_id = IcebergUtils::TryGetNumFromObject(root, "current-schema-id");
 	auto snapshot = FindSnapshotByIdTimestampInternal(snapshots, timestamp);
 
 	if (!snapshot) {
 		throw IOException("Could not find latest snapshots for timestamp " + Timestamp::ToString(timestamp));
 	}
 
-	return ParseSnapShot(snapshot, iceberg_format_version, schemas);
+	return ParseSnapShot(snapshot, iceberg_format_version, schema_id, schemas);
 }
 
 string IcebergSnapshot::ReadMetaData(string &path, FileSystem &fs) {
@@ -147,7 +150,7 @@ string IcebergSnapshot::ReadMetaData(string &path, FileSystem &fs) {
 	return IcebergUtils::FileToString(metadata_file_path, fs);
 }
 
-IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, yyjson_val* schemas) {
+IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id, yyjson_val* schemas) {
 	IcebergSnapshot ret;
 	auto snapshot_tag = yyjson_get_tag(snapshot);
 	if (snapshot_tag != YYJSON_TYPE_OBJ) {
@@ -164,7 +167,7 @@ IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t icebe
 	ret.timestamp_ms = Timestamp::FromEpochMs(IcebergUtils::TryGetNumFromObject(snapshot, "timestamp-ms"));
 	ret.manifest_list = IcebergUtils::TryGetStrFromObject(snapshot, "manifest-list");
 	ret.iceberg_format_version = iceberg_format_version;
-	ret.schema_id = IcebergUtils::TryGetNumFromObject(snapshot, "schema-id");
+	ret.schema_id = schema_id;
 	ret.schema = ParseSchema(schemas, ret.schema_id);
 
 	return ret;

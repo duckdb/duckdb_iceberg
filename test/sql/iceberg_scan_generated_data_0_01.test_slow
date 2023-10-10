@@ -16,14 +16,29 @@ SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_ice
 ----
 <FILE>:data/iceberg/generated_spec1_0_01/expected_results/last/count.csv
 
+# Check schema is identical, sorting by uuid to guarantee unique order
+query I nosort q1-schema
+DESCRIBE SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table') ORDER BY uuid;
+----
+
+query I nosort q1-schema
+DESCRIBE SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec1_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
+----
+
 # Check data is identical, sorting by uuid to guarantee unique order
-query I nosort q1
+query I nosort q1-data
 SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table') ORDER BY uuid;
 ----
 
-query I nosort q1
+query I nosort q1-data
 SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec1_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
 ----
+
+# Confirm the type matches that of the iceberg schema
+query IIIIII
+DESCRIBE SELECT schema_evol_added_col_1 FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table') ORDER BY uuid;
+----
+schema_evol_added_col_1	BIGINT	YES	NULL	NULL	NULL
 
 ### Iceberg spec v2
 
@@ -33,11 +48,26 @@ SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_ice
 ----
 <FILE>:data/iceberg/generated_spec2_0_01/expected_results/last/count.csv
 
+# Check schema is identical, sorting by uuid to guarantee unique order
+query I nosort q2-schema
+DESCRIBE SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_table') ORDER BY uuid;
+----
+
+query I nosort q2-schema
+DESCRIBE SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec2_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
+----
+
 # Check data is identical, sorting by uuid to guarantee unique order
-query I nosort q2
+query I nosort q2-data
 SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_table') ORDER BY uuid;
 ----
 
-query I nosort q2
+query I nosort q2-data
 SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec2_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
 ----
+
+# Confirm the type matches that of the iceberg schema
+query IIIIII
+DESCRIBE SELECT schema_evol_added_col_1 FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_table') ORDER BY uuid;
+----
+schema_evol_added_col_1	BIGINT	YES	NULL	NULL	NULL
