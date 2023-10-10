@@ -10,22 +10,20 @@ require-env DUCKDB_ICEBERG_HAVE_TEST_DATA
 
 ### Iceberg spec v1
 
-foreach iceberg_spec 1
+# Check count matches
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table');
+----
+<FILE>:data/iceberg/generated_spec1_0_01/expected_results/last/count.csv
 
-## Check count matches
-#query I
-#SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table');
-#----
-#<FILE>:data/iceberg/generated_spec1_0_01/expected_results/last/count.csv
+# Check data is identical, sorting by uuid to guarantee unique order
+query I nosort q1
+SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table') ORDER BY uuid;
+----
 
-## Check data is identical, sorting by uuid to guarantee unique order
-#query I nosort q1
-#SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table') ORDER BY uuid;
-#----
-#
-#query I nosort q1
-#SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec1_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
-#----
+query I nosort q1
+SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec1_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
+----
 
 ### Iceberg spec v2
 
@@ -43,5 +41,3 @@ SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_ta
 query I nosort q2
 SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec2_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
 ----
-
-endloop
