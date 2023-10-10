@@ -18,9 +18,19 @@ SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_ice
 ----
 <FILE>:data/iceberg/generated_spec1_0_01/expected_results/last/count.csv
 
+# We should also be able to scan the metadata file directly
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table/metadata/v6.metadata.json');
+----
+<FILE>:data/iceberg/generated_spec1_0_01/expected_results/last/count.csv
+
 # Check data is identical, sorting by uuid to guarantee unique order
 query I nosort q1
 SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table') ORDER BY uuid;
+----
+
+query I nosort q1
+SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_table/metadata/v6.metadata.json') ORDER BY uuid;
 ----
 
 query I nosort q1
@@ -35,9 +45,20 @@ SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_ice
 ----
 <FILE>:data/iceberg/generated_spec2_0_01/expected_results/last/count.csv
 
+# We should also be able to scan the metadata file directly
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_table/metadata/v6.metadata.json');
+----
+<FILE>:data/iceberg/generated_spec2_0_01/expected_results/last/count.csv
+
 # Check data is identical, sorting by uuid to guarantee unique order
 query I nosort q2
 SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_table') ORDER BY uuid;
+----
+
+# Check data is identical, sorting by uuid to guarantee unique order
+query I nosort q2
+SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_table/metadata/v6.metadata.json') ORDER BY uuid;
 ----
 
 query I nosort q2

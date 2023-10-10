@@ -134,10 +134,15 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(string &path, FileSystem
 }
 
 string IcebergSnapshot::ReadMetaData(string &path, FileSystem &fs) {
-	auto table_version = GetTableVersion(path, fs);
+	string metadata_file_path;
 
-	auto meta_path = fs.JoinPath(path, "metadata");
-	auto metadata_file_path = fs.JoinPath(meta_path, "v" + to_string(table_version) + ".metadata.json");
+	if (StringUtil::EndsWith(path, ".json")) {
+		metadata_file_path = path;
+	} else {
+		auto table_version = GetTableVersion(path, fs);
+		auto meta_path = fs.JoinPath(path, "metadata");
+		metadata_file_path = fs.JoinPath(meta_path, "v" + table_version + ".metadata.json");
+	}
 
 	return IcebergUtils::FileToString(metadata_file_path, fs);
 }
@@ -163,13 +168,13 @@ IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t icebe
 	return ret;
 }
 
-idx_t IcebergSnapshot::GetTableVersion(string &path, FileSystem &fs) {
+string IcebergSnapshot::GetTableVersion(string &path, FileSystem &fs) {
 	auto meta_path = fs.JoinPath(path, "metadata");
 	auto version_file_path = fs.JoinPath(meta_path, "version-hint.text");
 	auto version_file_content = IcebergUtils::FileToString(version_file_path, fs);
 
 	try {
-		return std::stoll(version_file_content);
+		return version_file_content;
 	} catch (std::invalid_argument &e) {
 		throw IOException("Iceberg version hint file contains invalid value");
 	} catch (std::out_of_range &e) {
