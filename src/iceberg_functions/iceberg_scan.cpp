@@ -108,7 +108,7 @@ static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, 
 		vector<unique_ptr<ParsedExpression>> left_children;
 		left_children.push_back(make_uniq<ConstantExpression>(Value::LIST(data_file_values)));
 		table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
-		return table_function_ref_data;
+		return std::move(table_function_ref_data);
 	}
 
 	// Join
