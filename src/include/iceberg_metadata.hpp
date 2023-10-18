@@ -29,6 +29,12 @@ public:
 	bool required;
 };
 
+struct SnapshotParseInfo {
+	yyjson_val * snapshots;
+	yyjson_val * schemas;
+	uint64_t iceberg_version;
+	uint64_t schema_id;
+};
 
 //! An Iceberg snapshot https://iceberg.apache.org/spec/#snapshots
 class IcebergSnapshot {
@@ -57,6 +63,7 @@ protected:
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);
 	static vector<IcebergColumnDefinition> ParseSchema(yyjson_val *schemas, idx_t schema_id);
+	static SnapshotParseInfo GetParseInfo(string &path, FileSystem &fs);
 };
 
 //! Represents the iceberg table at a specific IcebergSnapshot. Corresponds to a single Manifest List.
