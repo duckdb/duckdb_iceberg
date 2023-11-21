@@ -19,13 +19,19 @@ LOAD iceberg;
 
 SET s3_access_key_id='admin';
 SET s3_secret_access_key='password';
-SET s3_endpoint='localhost:9000';
+SET s3_endpoint='127.0.0.1:9000';
 SET s3_url_style='path';
 SET s3_use_ssl=false;
 
-SELECT * FROM iceberg_scan('${UNPARTITIONED_TABLE_PATH}')
+SELECT * FROM iceberg_scan('${UNPARTITIONED_TABLE_PATH}');
 END
 
 )
 
-duckdb -s $SQL
+if test -f "../build/release/duckdb"
+then
+  # in CI
+  ../build/release/duckdb -s "$SQL"
+else
+  duckdb -s "$SQL"
+fi
