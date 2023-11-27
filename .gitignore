@@ -8,3 +8,6 @@ test/python/__pycache__/
 .Rhistory
 test/sql/tmp.test
 data/iceberg/generated_*
+scripts/metastore_db/
+scripts/derby.log
+scripts/test-script-with-path.sql

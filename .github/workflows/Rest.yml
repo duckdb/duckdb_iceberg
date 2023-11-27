@@ -1,0 +1,64 @@
+name: Rest
+on: [pull_request, repository_dispatch]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/main' || github.sha }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  rest:
+    name: Test against Rest Catalog
+    runs-on: ubuntu-latest
+    env:
+      VCPKG_TARGET_TRIPLET: 'x64-linux'
+      GEN: Ninja
+      VCPKG_TOOLCHAIN_PATH: ${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+    steps:
+      - name: Install required ubuntu packages
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt-get install -y -qq software-properties-common
+          sudo add-apt-repository ppa:git-core/ppa
+          sudo apt-get update -y -qq
+          sudo apt-get install -y -qq ninja-build make gcc-multilib g++-multilib libssl-dev wget openjdk-8-jdk zip maven unixodbc-dev libc6-dev-i386 lib32readline6-dev libssl-dev libcurl4-gnutls-dev libexpat1-dev gettext unzip build-essential checkinstall libffi-dev curl libz-dev openssh-client
+          sudo apt-get install -y -qq tar pkg-config
+          sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
+      - name: Install Git 2.18.5
+        run: |
+          wget https://github.com/git/git/archive/refs/tags/v2.18.5.tar.gz
+          tar xvf v2.18.5.tar.gz
+          cd git-2.18.5
+          make
+          sudo make prefix=/usr install
+          git --version
+
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Setup ManyLinux2014
+        run: |
+          ./duckdb/scripts/setup_manylinux2014.sh general aws-cli ccache ssh openssl python_alias
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11.1
+        with:
+          vcpkgGitCommitId: 501db0f17ef6df184fcdbfbe0f87cde2313b6ab1
+
+      - name: Build extension
+        env:
+          GEN: ninja
+          STATIC_LIBCPP: 1
+        run: |
+          make release
+
+      - name: Start Rest Catalog
+        working-directory: scripts/
+        run: |
+          ./start-rest-catalog.sh
