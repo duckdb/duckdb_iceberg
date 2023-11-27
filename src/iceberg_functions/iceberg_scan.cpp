@@ -138,7 +138,7 @@ static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, 
 		                                                        make_uniq<ColumnRefExpression>("schema"),
 		                                                        make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))));
 		table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
-		return table_function_ref_data;
+		return std::move(table_function_ref_data);
 	}
 
 	// Join

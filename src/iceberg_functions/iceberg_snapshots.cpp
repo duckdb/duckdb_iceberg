@@ -33,7 +33,7 @@ public:
 		global_state->iceberg_format_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 		auto snapshots = yyjson_obj_get(root, "snapshots");
 		yyjson_arr_iter_init(snapshots, &global_state->snapshot_it);
-		return global_state;
+		return std::move(global_state);
 	}
 
 	string metadata_file;
@@ -60,7 +60,7 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	names.emplace_back("manifest_list");
 	return_types.emplace_back(LogicalType::VARCHAR);
 
-	return bind_data;
+	return std::move(bind_data);
 }
 
 // Snapshots function
@@ -94,7 +94,7 @@ TableFunctionSet IcebergFunctions::GetIcebergSnapshotsFunction() {
 	TableFunction table_function({LogicalType::VARCHAR}, IcebergSnapshotsFunction, IcebergSnapshotsBind,
 	                             IcebergSnapshotGlobalTableFunctionState::Init);
 	function_set.AddFunction(table_function);
-	return function_set;
+	return std::move(function_set);
 }
 
 } // namespace duckdb
