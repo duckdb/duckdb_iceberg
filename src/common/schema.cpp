@@ -31,7 +31,7 @@ static LogicalType ParseList(yyjson_val *list_type) {
 	D_ASSERT(yyjson_get_tag(list_type) == YYJSON_TYPE_OBJ);
 	D_ASSERT(IcebergUtils::TryGetStrFromObject(list_type, "type") == "list");
 
-	//NOTE: 'element-id', 'element-required' are ignored for now
+	// NOTE: 'element-id', 'element-required' are ignored for now
 	auto element = yyjson_obj_get(list_type, "element");
 	auto child_type = ParseType(element);
 	return LogicalType::LIST(child_type);
@@ -41,7 +41,7 @@ static LogicalType ParseMap(yyjson_val *map_type) {
 	D_ASSERT(yyjson_get_tag(map_type) == YYJSON_TYPE_OBJ);
 	D_ASSERT(IcebergUtils::TryGetStrFromObject(map_type, "type") == "map");
 
-	//NOTE: 'key-id', 'value-id', 'value-required' are ignored for now
+	// NOTE: 'key-id', 'value-id', 'value-required' are ignored for now
 	auto key = yyjson_obj_get(map_type, "key");
 	auto value = yyjson_obj_get(map_type, "value");
 
@@ -114,7 +114,7 @@ static LogicalType ParseType(yyjson_val *type) {
 		return LogicalType::UUID;
 	}
 	if (StringUtil::StartsWith(type_str, "fixed")) {
-		// Is this the right conversion ?
+		// FIXME: use fixed size type in DuckDB
 		return LogicalType::BLOB;
 	}
 	if (type_str == "binary") {
@@ -125,7 +125,7 @@ static LogicalType ParseType(yyjson_val *type) {
 		D_ASSERT(type_str.back() == ')');
 		auto start = type_str.find('(');
 		auto end = type_str.rfind(')');
-		auto raw_digits = type_str.substr(start+1, end - start);
+		auto raw_digits = type_str.substr(start + 1, end - start);
 		auto digits = StringUtil::Split(raw_digits, ',');
 		D_ASSERT(digits.size() == 2);
 
@@ -136,7 +136,7 @@ static LogicalType ParseType(yyjson_val *type) {
 	throw IOException("Encountered an unrecognized type in JSON schema: \"%s\"", type_str);
 }
 
-IcebergColumnDefinition IcebergColumnDefinition::ParseFromJson(yyjson_val* val) {
+IcebergColumnDefinition IcebergColumnDefinition::ParseFromJson(yyjson_val *val) {
 	IcebergColumnDefinition ret;
 
 	ret.id = IcebergUtils::TryGetNumFromObject(val, "id");
@@ -168,18 +168,16 @@ static vector<IcebergColumnDefinition> ParseSchemaFromJson(yyjson_val *schema_js
 	return ret;
 }
 
-vector<IcebergColumnDefinition> IcebergSnapshot::ParseSchema(yyjson_val *schemas, idx_t schema_id) {
-	size_t idx, max;
-	yyjson_val *schema;
+vector<IcebergColumnDefinition> IcebergSnapshot::ParseSchema(vector<yyjson_val *> &schemas, idx_t schema_id) {
 	// Multiple schemas can be present in the json metadata 'schemas' list
-	yyjson_arr_foreach(schemas, idx, max, schema) {
-		auto found_schema_id = IcebergUtils::TryGetNumFromObject(schema, "schema-id");
+	for (const auto &schema_ptr : schemas) {
+		auto found_schema_id = IcebergUtils::TryGetNumFromObject(schema_ptr, "schema-id");
 		if (found_schema_id == schema_id) {
-			return ParseSchemaFromJson(schema);
+			return ParseSchemaFromJson(schema_ptr);
 		}
 	}
 
 	throw IOException("Iceberg schema with schema id " + to_string(schema_id) + " was not found!");
 }
 
-} //namespace duckdb
+} // namespace duckdb

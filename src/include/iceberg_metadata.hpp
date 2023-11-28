@@ -16,7 +16,7 @@ namespace duckdb {
 
 struct IcebergColumnDefinition {
 public:
-	static IcebergColumnDefinition ParseFromJson(yyjson_val* val);
+	static IcebergColumnDefinition ParseFromJson(yyjson_val *val);
 
 	LogicalType ToDuckDBType() {
 		return type;
@@ -30,8 +30,18 @@ public:
 };
 
 struct SnapshotParseInfo {
-	yyjson_val * snapshots;
-	yyjson_val * schemas;
+	~SnapshotParseInfo() {
+		if (doc) {
+			yyjson_doc_free(doc);
+		}
+	}
+	// Ownership of parse data
+	yyjson_doc *doc;
+	string document;
+
+	//! Parsed info
+	yyjson_val *snapshots;
+	vector<yyjson_val *> schemas;
 	uint64_t iceberg_version;
 	uint64_t schema_id;
 };
@@ -52,9 +62,12 @@ public:
 	static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id);
 	static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp);
 
-	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id, yyjson_val* schemas);
+	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
+	                                     vector<yyjson_val *> &schemas);
 	static string ReadMetaData(string &path, FileSystem &fs);
-	static yyjson_val * GetSnapshots(string &path, FileSystem &fs);
+	static yyjson_val *GetSnapshots(string &path, FileSystem &fs);
+	//! Note: caller keeps ownership of yyjson doc
+	static unique_ptr<SnapshotParseInfo> GetParseInfo(yyjson_doc *metadata_json);
 
 protected:
 	//! Internal JSON parsing functions
@@ -62,8 +75,8 @@ protected:
 	static yyjson_val *FindLatestSnapshotInternal(yyjson_val *snapshots);
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);
-	static vector<IcebergColumnDefinition> ParseSchema(yyjson_val *schemas, idx_t schema_id);
-	static SnapshotParseInfo GetParseInfo(string &path, FileSystem &fs);
+	static vector<IcebergColumnDefinition> ParseSchema(vector<yyjson_val *> &schemas, idx_t schema_id);
+	static unique_ptr<SnapshotParseInfo> GetParseInfo(string &path, FileSystem &fs);
 };
 
 //! Represents the iceberg table at a specific IcebergSnapshot. Corresponds to a single Manifest List.

@@ -63,7 +63,8 @@ vector<IcebergManifest> IcebergTable::ReadManifestListFile(string path, FileSyst
 	return ret;
 }
 
-vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(string path, FileSystem &fs, idx_t iceberg_format_version) {
+vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(string path, FileSystem &fs,
+                                                               idx_t iceberg_format_version) {
 	vector<IcebergManifestEntry> ret;
 
 	// TODO: make streaming
@@ -89,49 +90,77 @@ vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(string path, File
 	return ret;
 }
 
-SnapshotParseInfo IcebergSnapshot::GetParseInfo(string &path, FileSystem &fs) {
+unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(yyjson_doc *metadata_json) {
 	SnapshotParseInfo info {};
-	auto metadata_json = ReadMetaData(path, fs);
-	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
-	auto root = yyjson_doc_get_root(doc);
+	auto root = yyjson_doc_get_root(metadata_json);
 	info.iceberg_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 	info.snapshots = yyjson_obj_get(root, "snapshots");
-	info.schemas = yyjson_obj_get(root, "schemas");
-	info.schema_id = IcebergUtils::TryGetNumFromObject(root, "current-schema-id");
-	return info;
+
+	// Multiple schemas can be present in the json metadata 'schemas' list
+	if (yyjson_obj_getn(root, "current-schema-id", string("current-schema-id").size())) {
+		size_t idx, max;
+		yyjson_val *schema;
+		info.schema_id = IcebergUtils::TryGetNumFromObject(root, "current-schema-id");
+		auto schemas = yyjson_obj_get(root, "schemas");
+		yyjson_arr_foreach(schemas, idx, max, schema) {
+			info.schemas.push_back(schema);
+		}
+	} else {
+		auto schema = yyjson_obj_get(root, "schema");
+		if (!schema) {
+			throw IOException("Neither a valid schema or schemas field was found");
+		}
+		auto found_schema_id = IcebergUtils::TryGetNumFromObject(schema, "schema-id");
+		info.schemas.push_back(schema);
+		info.schema_id = found_schema_id;
+	}
+
+	return make_uniq<SnapshotParseInfo>(std::move(info));
+}
+
+unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(string &path, FileSystem &fs) {
+	auto metadata_json = ReadMetaData(path, fs);
+	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
+	auto parse_info = GetParseInfo(doc);
+
+	// Transfer string and yyjson doc ownership
+	parse_info->doc = doc;
+	parse_info->document = std::move(metadata_json);
+
+	return std::move(parse_info);
 }
 
 IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(string &path, FileSystem &fs) {
-	auto info = GetParseInfo(path,fs);
-	auto latest_snapshot = FindLatestSnapshotInternal(info.snapshots);
+	auto info = GetParseInfo(path, fs);
+	auto latest_snapshot = FindLatestSnapshotInternal(info->snapshots);
 
 	if (!latest_snapshot) {
 		throw IOException("No snapshots found");
 	}
 
-	return ParseSnapShot(latest_snapshot, info.iceberg_version, info.schema_id, info.schemas);
+	return ParseSnapShot(latest_snapshot, info->iceberg_version, info->schema_id, info->schemas);
 }
 
 IcebergSnapshot IcebergSnapshot::GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id) {
-	auto info = GetParseInfo(path,fs);
-	auto snapshot = FindSnapshotByIdInternal(info.snapshots, snapshot_id);
+	auto info = GetParseInfo(path, fs);
+	auto snapshot = FindSnapshotByIdInternal(info->snapshots, snapshot_id);
 
 	if (!snapshot) {
 		throw IOException("Could not find snapshot with id " + to_string(snapshot_id));
 	}
 
-	return ParseSnapShot(snapshot, info.iceberg_version, info.schema_id, info.schemas);
+	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas);
 }
 
 IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp) {
-	auto info = GetParseInfo(path,fs);
-	auto snapshot = FindSnapshotByIdTimestampInternal(info.snapshots, timestamp);
+	auto info = GetParseInfo(path, fs);
+	auto snapshot = FindSnapshotByIdTimestampInternal(info->snapshots, timestamp);
 
 	if (!snapshot) {
 		throw IOException("Could not find latest snapshots for timestamp " + Timestamp::ToString(timestamp));
 	}
 
-	return ParseSnapShot(snapshot, info.iceberg_version, info.schema_id, info.schemas);
+	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas);
 }
 
 string IcebergSnapshot::ReadMetaData(string &path, FileSystem &fs) {
@@ -148,7 +177,8 @@ string IcebergSnapshot::ReadMetaData(string &path, FileSystem &fs) {
 	return IcebergUtils::FileToString(metadata_file_path, fs);
 }
 
-IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id, yyjson_val* schemas) {
+IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
+                                               vector<yyjson_val *> &schemas) {
 	IcebergSnapshot ret;
 	auto snapshot_tag = yyjson_get_tag(snapshot);
 	if (snapshot_tag != YYJSON_TYPE_OBJ) {
