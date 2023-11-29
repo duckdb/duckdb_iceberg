@@ -66,8 +66,7 @@ public:
 	                                     vector<yyjson_val *> &schemas);
 	static string ReadMetaData(const string &path, FileSystem &fs);
 	static yyjson_val *GetSnapshots(const string &path, FileSystem &fs);
-	//! Note: caller keeps ownership of yyjson doc
-	static unique_ptr<SnapshotParseInfo> GetParseInfo(yyjson_doc *metadata_json);
+	static unique_ptr<SnapshotParseInfo> GetParseInfo(yyjson_doc &metadata_json);
 
 protected:
 	//! Internal JSON parsing functions

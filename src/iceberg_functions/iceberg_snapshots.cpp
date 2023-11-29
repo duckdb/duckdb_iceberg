@@ -73,7 +73,7 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 			break;
 		}
 
-		auto parse_info = IcebergSnapshot::GetParseInfo(global_state.metadata_doc);
+		auto parse_info = IcebergSnapshot::GetParseInfo(*global_state.metadata_doc);
 		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot, global_state.iceberg_format_version,
 		                                               parse_info->schema_id, parse_info->schemas);
 

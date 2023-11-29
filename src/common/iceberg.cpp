@@ -90,9 +90,9 @@ vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(const string &pat
 	return ret;
 }
 
-unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(yyjson_doc *metadata_json) {
+unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(yyjson_doc &metadata_json) {
 	SnapshotParseInfo info {};
-	auto root = yyjson_doc_get_root(metadata_json);
+	auto root = yyjson_doc_get_root(&metadata_json);
 	info.iceberg_version = IcebergUtils::TryGetNumFromObject(root, "format-version");
 	info.snapshots = yyjson_obj_get(root, "snapshots");
 
@@ -121,7 +121,7 @@ unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(yyjson_doc *metadata
 unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(const string &path, FileSystem &fs) {
 	auto metadata_json = ReadMetaData(path, fs);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
-	auto parse_info = GetParseInfo(doc);
+	auto parse_info = GetParseInfo(*doc);
 
 	// Transfer string and yyjson doc ownership
 	parse_info->doc = doc;
