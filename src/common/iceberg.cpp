@@ -35,7 +35,7 @@ IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &sna
 	return ret;
 }
 
-vector<IcebergManifest> IcebergTable::ReadManifestListFile(string path, FileSystem &fs, idx_t iceberg_format_version) {
+vector<IcebergManifest> IcebergTable::ReadManifestListFile(const string &path, FileSystem &fs, idx_t iceberg_format_version) {
 	vector<IcebergManifest> ret;
 
 	// TODO: make streaming
@@ -63,7 +63,7 @@ vector<IcebergManifest> IcebergTable::ReadManifestListFile(string path, FileSyst
 	return ret;
 }
 
-vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(string path, FileSystem &fs,
+vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(const string &path, FileSystem &fs,
                                                                idx_t iceberg_format_version) {
 	vector<IcebergManifestEntry> ret;
 
@@ -118,7 +118,7 @@ unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(yyjson_doc *metadata
 	return make_uniq<SnapshotParseInfo>(std::move(info));
 }
 
-unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(string &path, FileSystem &fs) {
+unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(const string &path, FileSystem &fs) {
 	auto metadata_json = ReadMetaData(path, fs);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto parse_info = GetParseInfo(doc);
@@ -130,7 +130,7 @@ unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(string &path, FileSy
 	return std::move(parse_info);
 }
 
-IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(string &path, FileSystem &fs) {
+IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(const string &path, FileSystem &fs) {
 	auto info = GetParseInfo(path, fs);
 	auto latest_snapshot = FindLatestSnapshotInternal(info->snapshots);
 
@@ -141,7 +141,7 @@ IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(string &path, FileSystem &fs)
 	return ParseSnapShot(latest_snapshot, info->iceberg_version, info->schema_id, info->schemas);
 }
 
-IcebergSnapshot IcebergSnapshot::GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id) {
+IcebergSnapshot IcebergSnapshot::GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id) {
 	auto info = GetParseInfo(path, fs);
 	auto snapshot = FindSnapshotByIdInternal(info->snapshots, snapshot_id);
 
@@ -152,7 +152,7 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotById(string &path, FileSystem &fs, i
 	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas);
 }
 
-IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp) {
+IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp) {
 	auto info = GetParseInfo(path, fs);
 	auto snapshot = FindSnapshotByIdTimestampInternal(info->snapshots, timestamp);
 
@@ -163,7 +163,7 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(string &path, FileSystem
 	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas);
 }
 
-string IcebergSnapshot::ReadMetaData(string &path, FileSystem &fs) {
+string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs) {
 	string metadata_file_path;
 
 	if (StringUtil::EndsWith(path, ".json")) {
@@ -201,7 +201,7 @@ IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t icebe
 	return ret;
 }
 
-string IcebergSnapshot::GetTableVersion(string &path, FileSystem &fs) {
+string IcebergSnapshot::GetTableVersion(const string &path, FileSystem &fs) {
 	auto meta_path = fs.JoinPath(path, "metadata");
 	auto version_file_path = fs.JoinPath(meta_path, "version-hint.text");
 	auto version_file_content = IcebergUtils::FileToString(version_file_path, fs);

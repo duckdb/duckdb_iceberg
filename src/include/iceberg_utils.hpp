@@ -25,9 +25,9 @@ public:
 	static string GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs);
 
 	//! YYJSON utility functions
-	static uint64_t TryGetNumFromObject(yyjson_val *obj, string field);
-	static string TryGetStrFromObject(yyjson_val *obj, string field);
-	static bool TryGetBoolFromObject(yyjson_val *obj, string field);
+	static uint64_t TryGetNumFromObject(yyjson_val *obj, const string &field);
+	static string TryGetStrFromObject(yyjson_val *obj, const string &field);
+	static bool TryGetBoolFromObject(yyjson_val *obj, const string &field);
 };
 
 } // namespace duckdb

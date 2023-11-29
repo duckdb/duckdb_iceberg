@@ -58,25 +58,25 @@ public:
 	uint64_t schema_id;
 	vector<IcebergColumnDefinition> schema;
 
-	static IcebergSnapshot GetLatestSnapshot(string &path, FileSystem &fs);
-	static IcebergSnapshot GetSnapshotById(string &path, FileSystem &fs, idx_t snapshot_id);
-	static IcebergSnapshot GetSnapshotByTimestamp(string &path, FileSystem &fs, timestamp_t timestamp);
+	static IcebergSnapshot GetLatestSnapshot(const string &path, FileSystem &fs);
+	static IcebergSnapshot GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id);
+	static IcebergSnapshot GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp);
 
 	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
 	                                     vector<yyjson_val *> &schemas);
-	static string ReadMetaData(string &path, FileSystem &fs);
-	static yyjson_val *GetSnapshots(string &path, FileSystem &fs);
+	static string ReadMetaData(const string &path, FileSystem &fs);
+	static yyjson_val *GetSnapshots(const string &path, FileSystem &fs);
 	//! Note: caller keeps ownership of yyjson doc
 	static unique_ptr<SnapshotParseInfo> GetParseInfo(yyjson_doc *metadata_json);
 
 protected:
 	//! Internal JSON parsing functions
-	static string GetTableVersion(string &path, FileSystem &fs);
+	static string GetTableVersion(const string &path, FileSystem &fs);
 	static yyjson_val *FindLatestSnapshotInternal(yyjson_val *snapshots);
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);
 	static vector<IcebergColumnDefinition> ParseSchema(vector<yyjson_val *> &schemas, idx_t schema_id);
-	static unique_ptr<SnapshotParseInfo> GetParseInfo(string &path, FileSystem &fs);
+	static unique_ptr<SnapshotParseInfo> GetParseInfo(const string &path, FileSystem &fs);
 };
 
 //! Represents the iceberg table at a specific IcebergSnapshot. Corresponds to a single Manifest List.
@@ -117,8 +117,8 @@ public:
 	vector<IcebergTableEntry> entries;
 
 protected:
-	static vector<IcebergManifest> ReadManifestListFile(string path, FileSystem &fs, idx_t iceberg_format_version);
-	static vector<IcebergManifestEntry> ReadManifestEntries(string path, FileSystem &fs, idx_t iceberg_format_version);
+	static vector<IcebergManifest> ReadManifestListFile(const string &path, FileSystem &fs, idx_t iceberg_format_version);
+	static vector<IcebergManifestEntry> ReadManifestEntries(const string &path, FileSystem &fs, idx_t iceberg_format_version);
 	string path;
 };
 
