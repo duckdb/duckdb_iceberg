@@ -49,8 +49,10 @@ To generate the test data, run:
 ```shell
 make data
 ```
-Note that the script requires python3, pyspark and duckdb-python to be installed. Assuming python3 is already installed,
-running `python3 -m pip install duckdb pyspark` should do the trick.
+
+**Note** that the script requires python3, pyspark and duckdb-python to be installed. Make sure that the correct versions for pyspark (3.5.0), java and scala (2.12) are installed.
+
+running `python3 -m pip install duckdb pyspark[sql]==3.5.0` should do the trick.
 
 #### Running unit tests
 
