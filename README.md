@@ -25,7 +25,7 @@ some issue that seems to cause issues with the avro files produced by the spark 
 ### Test data generation
 
 To generate test data, the script in 'scripts/test_data_generator' is used to have spark generate some test data. This is 
-based on pyspark 3.4, which you can install through pip. 
+based on pyspark 3.5, which you can install through pip. 
 
 ### Building the extension
 
