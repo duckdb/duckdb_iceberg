@@ -1,6 +1,7 @@
 #include "duckdb/common/file_opener.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "iceberg_metadata.hpp"
+#include "iceberg_utils.hpp"
 #include "iceberg_functions.hpp"
 #include "yyjson.hpp"
 
@@ -72,7 +73,9 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 			break;
 		}
 
-		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot, global_state.iceberg_format_version);
+		auto parse_info = IcebergSnapshot::GetParseInfo(*global_state.metadata_doc);
+		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot, global_state.iceberg_format_version,
+		                                               parse_info->schema_id, parse_info->schemas);
 
 		FlatVector::GetData<int64_t>(output.data[0])[i] = snapshot.sequence_number;
 		FlatVector::GetData<int64_t>(output.data[1])[i] = snapshot.snapshot_id;

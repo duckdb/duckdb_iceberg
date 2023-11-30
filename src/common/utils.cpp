@@ -26,7 +26,7 @@ string IcebergUtils::GetFullPath(const string &iceberg_path, const string &relat
 	throw IOException("Did not recognize iceberg path");
 }
 
-uint64_t IcebergUtils::TryGetNumFromObject(yyjson_val *obj, string field) {
+uint64_t IcebergUtils::TryGetNumFromObject(yyjson_val *obj, const string &field) {
 	auto val = yyjson_obj_getn(obj, field.c_str(), field.size());
 	if (!val || yyjson_get_tag(val) != YYJSON_TYPE_NUM) {
 		throw IOException("Invalid field found while parsing field: " + field);
@@ -34,7 +34,15 @@ uint64_t IcebergUtils::TryGetNumFromObject(yyjson_val *obj, string field) {
 	return yyjson_get_uint(val);
 }
 
-string IcebergUtils::TryGetStrFromObject(yyjson_val *obj, string field) {
+bool IcebergUtils::TryGetBoolFromObject(yyjson_val *obj, const string &field) {
+	auto val = yyjson_obj_getn(obj, field.c_str(), field.size());
+	if (!val || yyjson_get_tag(val) != YYJSON_TYPE_BOOL) {
+		throw IOException("Invalid field found while parsing field: " + field);
+	}
+	return yyjson_get_bool(val);
+}
+
+string IcebergUtils::TryGetStrFromObject(yyjson_val *obj, const string &field) {
 	auto val = yyjson_obj_getn(obj, field.c_str(), field.size());
 	if (!val || yyjson_get_tag(val) != YYJSON_TYPE_STR) {
 		throw IOException("Invalid field found while parsing field: " + field);

@@ -20,6 +20,7 @@
 #include "duckdb/common/file_opener.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "iceberg_metadata.hpp"
+#include "iceberg_utils.hpp"
 #include "iceberg_functions.hpp"
 #include "yyjson.hpp"
 
@@ -98,15 +99,46 @@ static unique_ptr<TableRef> MakeListFilesExpression(vector<Value> &data_file_val
 	return make_uniq<SubqueryRef>(std::move(select_statement), "iceberg_scan");
 }
 
+// Create the param for passing the iceberg schema to the parquet reader as a DuckDB map
+static Value GetParquetSchemaParam(vector<IcebergColumnDefinition> &schema) {
+	vector<Value> map_entries;
+
+	for (auto &schema_entry : schema) {
+		child_list_t<Value> map_value_children;
+		map_value_children.push_back(make_pair("name", Value(schema_entry.name)));
+		map_value_children.push_back(make_pair("type", Value(schema_entry.type.ToString())));
+		map_value_children.push_back(make_pair("default_value", schema_entry.default_value));
+		auto map_value = Value::STRUCT(map_value_children);
+
+		child_list_t<Value> map_entry_children;
+		map_entry_children.push_back(make_pair("key", schema_entry.id));
+		map_entry_children.push_back(make_pair("values", map_value));
+		auto map_entry = Value::STRUCT(map_entry_children);
+
+		map_entries.push_back(map_entry);
+	}
+
+	auto param_type =
+	    LogicalType::STRUCT({{"key", LogicalType::INTEGER},
+	                         {"value", LogicalType::STRUCT({{{"name", LogicalType::VARCHAR},
+	                                                         {"type", LogicalType::VARCHAR},
+	                                                         {"default_value", LogicalType::VARCHAR}}})}});
+	auto ret = Value::MAP(param_type, map_entries);
+	return ret;
+}
+
 //! Build the Parquet Scan expression for the files we need to scan
 static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, vector<Value> &delete_file_values,
-                                               bool allow_moved_paths) {
+                                               vector<IcebergColumnDefinition> &schema, bool allow_moved_paths) {
 	// No deletes, just return a TableFunctionRef for a parquet scan of the data files
 	if (delete_file_values.empty()) {
 		auto table_function_ref_data = make_uniq<TableFunctionRef>();
 		table_function_ref_data->alias = "iceberg_scan_data";
 		vector<unique_ptr<ParsedExpression>> left_children;
 		left_children.push_back(make_uniq<ConstantExpression>(Value::LIST(data_file_values)));
+		left_children.push_back(
+		    make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("schema"),
+		                                    make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))));
 		table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
 		return std::move(table_function_ref_data);
 	}
@@ -137,6 +169,10 @@ static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, 
 	left_children.push_back(make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL,
 	                                                        make_uniq<ColumnRefExpression>("file_row_number"),
 	                                                        make_uniq<ConstantExpression>(Value(1))));
+	left_children.push_back(
+	    make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("schema"),
+	                                    make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))));
+
 	table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
 	join_node->left = std::move(table_function_ref_data);
 
@@ -179,7 +215,8 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 		if (loption == "allow_moved_paths") {
 			allow_moved_paths = BooleanValue::Get(kv.second);
 			if (StringUtil::EndsWith(iceberg_path, ".json")) {
-				throw InvalidInputException("Enabling allow_moved_paths is not enabled for directly scanning metadata files.");
+				throw InvalidInputException(
+				    "Enabling allow_moved_paths is not enabled for directly scanning metadata files.");
 			}
 		} else if (loption == "mode") {
 			mode = StringValue::Get(kv.second);
@@ -217,7 +254,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	if (mode == "list_files") {
 		return MakeListFilesExpression(data_file_values, delete_file_values);
 	} else if (mode == "default") {
-		return MakeScanExpression(data_file_values, delete_file_values, allow_moved_paths);
+		return MakeScanExpression(data_file_values, delete_file_values, snapshot_to_scan.schema, allow_moved_paths);
 	} else {
 		throw NotImplementedException("Unknown mode type for ICEBERG_SCAN bind : '" + mode + "'");
 	}
@@ -226,8 +263,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 TableFunctionSet IcebergFunctions::GetIcebergScanFunction() {
 	TableFunctionSet function_set("iceberg_scan");
 
-	auto fun =
-	    TableFunction({LogicalType::VARCHAR}, nullptr, nullptr, IcebergScanGlobalTableFunctionState::Init);
+	auto fun = TableFunction({LogicalType::VARCHAR}, nullptr, nullptr, IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
