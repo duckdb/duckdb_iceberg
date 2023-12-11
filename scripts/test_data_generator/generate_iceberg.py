@@ -35,7 +35,7 @@ conf.set('spark.sql.catalog.iceberg_catalog.type', 'hadoop')
 conf.set('spark.sql.catalog.iceberg_catalog.warehouse', DEST_PATH)
 conf.set('spark.sql.parquet.outputTimestampType', 'TIMESTAMP_MICROS')
 conf.set('spark.driver.memory', '10g')
-conf.set('spark.jars', f'{SCRIPT_DIR}/iceberg-spark-runtime-3.4_2.12-1.3.0.jar')
+conf.set('spark.jars', f'{SCRIPT_DIR}/iceberg-spark-runtime-3.5_2.12-1.4.2.jar')
 conf.set('spark.sql.extensions', 'org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions')
 spark = pyspark.sql.SparkSession.builder.config(conf=conf).getOrCreate()
 sc = spark.sparkContext
