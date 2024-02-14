@@ -93,11 +93,6 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 	return std::move(ret);
 }
 
-static unique_ptr<FunctionData> IcebergScanBind(ClientContext &context, TableFunctionBindInput &input,
-                                                vector<LogicalType> &return_types, vector<string> &names) {
-	return nullptr;
-}
-
 static void IcebergMetaDataFunction(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
 	auto &bind_data = data.bind_data->Cast<IcebergMetaDataBindData>();
 	auto &global_state = data.global_state->Cast<IcebergMetaDataGlobalTableFunctionState>();

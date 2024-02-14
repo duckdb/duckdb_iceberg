@@ -25,7 +25,7 @@ some issue that seems to cause issues with the avro files produced by the spark 
 ### Test data generation
 
 To generate test data, the script in 'scripts/test_data_generator' is used to have spark generate some test data. This is 
-based on pyspark 3.4, which you can install through pip. 
+based on pyspark 3.5, which you can install through pip. 
 
 ### Building the extension
 
@@ -49,8 +49,10 @@ To generate the test data, run:
 ```shell
 make data
 ```
-Note that the script requires python3, pyspark and duckdb-python to be installed. Assuming python3 is already installed,
-running `python3 -m pip install duckdb pyspark` should do the trick.
+
+**Note** that the script requires python3, pyspark and duckdb-python to be installed. Make sure that the correct versions for pyspark (3.5.0), java and scala (2.12) are installed.
+
+running `python3 -m pip install duckdb pyspark[sql]==3.5.0` should do the trick.
 
 #### Running unit tests
 
