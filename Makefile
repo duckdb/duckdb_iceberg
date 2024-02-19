@@ -1,10 +1,16 @@
-.PHONY: all clean format debug release duckdb_debug duckdb_release pull update
+.PHONY: all clean format debug release duckdb_debug duckdb_release pull update wasm_mvp wasm_eh wasm_threads
 
 all: release
 
 MKFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 PROJ_DIR := $(dir $(MKFILE_PATH))
 DISABLE_SANITIZER_FLAG ?=
+
+ifeq ($(OS),Windows_NT)
+	TEST_PATH="/test/Release/unittest.exe"
+else
+	TEST_PATH="/test/unittest"
+endif
 
 OSX_BUILD_UNIVERSAL_FLAG=
 ifneq (${OSX_BUILD_ARCH}, "")
@@ -17,7 +23,7 @@ endif
 ifeq (${DISABLE_SANITIZER}, 1)
 	DISABLE_SANITIZER_FLAG=-DENABLE_SANITIZER=FALSE -DENABLE_UBSAN=0
 endif
-
+#### VCPKG config
 VCPKG_TOOLCHAIN_PATH?=
 ifneq ("${VCPKG_TOOLCHAIN_PATH}", "")
 	TOOLCHAIN_FLAGS:=${TOOLCHAIN_FLAGS} -DVCPKG_MANIFEST_DIR='${PROJ_DIR}' -DVCPKG_BUILD=1 -DCMAKE_TOOLCHAIN_FILE='${VCPKG_TOOLCHAIN_PATH}'
@@ -26,17 +32,28 @@ ifneq ("${VCPKG_TARGET_TRIPLET}", "")
 	TOOLCHAIN_FLAGS:=${TOOLCHAIN_FLAGS} -DVCPKG_TARGET_TRIPLET='${VCPKG_TARGET_TRIPLET}'
 endif
 
+#### Enable Ninja as generator
 ifeq ($(GEN),ninja)
 	GENERATOR=-G "Ninja"
 	FORCE_COLOR=-DFORCE_COLORED_OUTPUT=1
 endif
 
-BUILD_FLAGS=-DEXTENSION_STATIC_BUILD=1 -DBUILD_EXTENSIONS="httpfs" ${OSX_BUILD_UNIVERSAL_FLAG} ${STATIC_LIBCPP} ${TOOLCHAIN_FLAGS}
+BUILD_FLAGS=-DEXTENSION_STATIC_BUILD=1 -DBUILD_EXTENSIONS="httpfs" ${OSX_BUILD_UNIVERSAL_FLAG} ${STATIC_LIBCPP} ${TOOLCHAIN_FLAGS} -DDUCKDB_EXPLICIT_PLATFORM='${DUCKDB_PLATFORM}'
+
+EXT_NAME=iceberg
+
+#### Configuration for this extension
+EXTENSION_NAME=ICEBERG
+EXTENSION_FLAGS=\
+-DDUCKDB_EXTENSION_NAMES="iceberg" \
+-DDUCKDB_EXTENSION_${EXTENSION_NAME}_PATH="$(PROJ_DIR)" \
+-DDUCKDB_EXTENSION_${EXTENSION_NAME}_LOAD_TESTS=1 \
+-DDUCKDB_EXTENSION_${EXTENSION_NAME}_SHOULD_LINK=1 \
+-DDUCKDB_EXTENSION_${EXTENSION_NAME}_INCLUDE_PATH="$(PROJ_DIR)src/include" \
+-DDUCKDB_EXTENSION_${EXTENSION_NAME}_TEST_PATH="$(PROJ_DIR)test/sql"
+
 
 CLIENT_FLAGS :=
-
-# These flags will make DuckDB build the extension
-EXTENSION_FLAGS=-DDUCKDB_EXTENSION_NAMES="iceberg" -DDUCKDB_EXTENSION_ICEBERG_PATH="$(PROJ_DIR)" -DDUCKDB_EXTENSION_ICEBERG_SHOULD_LINK=1 -DDUCKDB_EXTENSION_ICEBERG_INCLUDE_PATH="$(PROJ_DIR)src/include"
 
 pull:
 	git submodule init
@@ -84,12 +101,10 @@ release_python: release
 
 # Main tests
 test: test_release
-
 test_release: release
-	./build/release/test/unittest --test-dir . "[sql]"
-
+	./build/release/$(TEST_PATH) "$(PROJ_DIR)test/*"
 test_debug: debug
-	./build/debug/test/unittest --test-dir . "[sql]"
+	./build/debug/$(TEST_PATH) "$(PROJ_DIR)test/*"
 
 # Client tests
 test_js: test_debug_js
@@ -122,3 +137,23 @@ data_large: data data_clean
 
 data_clean:
 	rm -rf data/iceberg/generated_*
+
+WASM_LINK_TIME_FLAGS=
+
+wasm_mvp:
+	mkdir -p build/wasm_mvp
+	emcmake cmake $(GENERATOR) -DWASM_LOADABLE_EXTENSIONS=1 -DBUILD_EXTENSIONS_ONLY=1 -Bbuild/wasm_mvp -DCMAKE_CXX_FLAGS="-DDUCKDB_CUSTOM_PLATFORM=wasm_mvp" -DSKIP_EXTENSIONS="parquet" -S duckdb $(TOOLCHAIN_FLAGS) $(EXTENSION_FLAGS) -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$(EMSDK)/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+	emmake make -j8 -Cbuild/wasm_mvp
+	cd build/wasm_mvp/extension/${EXT_NAME} && emcc $f -sSIDE_MODULE=1 -o ../../${EXT_NAME}.duckdb_extension.wasm -O3 ${EXT_NAME}.duckdb_extension $(WASM_LINK_TIME_FLAGS)
+
+wasm_eh:
+	mkdir -p build/wasm_eh
+	emcmake cmake $(GENERATOR) -DWASM_LOADABLE_EXTENSIONS=1 -DBUILD_EXTENSIONS_ONLY=1 -Bbuild/wasm_eh -DCMAKE_CXX_FLAGS="-fwasm-exceptions -DWEBDB_FAST_EXCEPTIONS=1 -DDUCKDB_CUSTOM_PLATFORM=wasm_eh" -DSKIP_EXTENSIONS="parquet" -S duckdb $(TOOLCHAIN_FLAGS) $(EXTENSION_FLAGS) -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$(EMSDK)/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+	emmake make -j8 -Cbuild/wasm_eh
+	cd build/wasm_eh/extension/${EXT_NAME} && emcc $f -sSIDE_MODULE=1 -o ../../${EXT_NAME}.duckdb_extension.wasm -O3 ${EXT_NAME}.duckdb_extension $(WASM_LINK_TIME_FLAGS)
+
+wasm_threads:
+	mkdir -p ./build/wasm_threads
+	emcmake cmake $(GENERATOR) -DWASM_LOADABLE_EXTENSIONS=1 -DBUILD_EXTENSIONS_ONLY=1 -Bbuild/wasm_threads -DCMAKE_CXX_FLAGS="-fwasm-exceptions -DWEBDB_FAST_EXCEPTIONS=1 -DWITH_WASM_THREADS=1 -DWITH_WASM_SIMD=1 -DWITH_WASM_BULK_MEMORY=1 -DDUCKDB_CUSTOM_PLATFORM=wasm_threads" -DSKIP_EXTENSIONS="parquet" -S duckdb $(TOOLCHAIN_FLAGS) $(EXTENSION_FLAGS) -DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$(EMSDK)/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+	emmake make -j8 -Cbuild/wasm_threads
+	cd build/wasm_threads/extension/${EXT_NAME} && emcc $f -sSIDE_MODULE=1 -o ../../${EXT_NAME}.duckdb_extension.wasm -O3 ${EXT_NAME}.duckdb_extension $(WASM_LINK_TIME_FLAGS)

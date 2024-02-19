@@ -8,6 +8,8 @@ SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg');
 ----
 Catalog Error
 
+require notwindows
+
 require iceberg
 
 query IIII

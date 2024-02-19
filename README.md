@@ -1,8 +1,4 @@
-> **Disclaimer:** This extension is currently in an experimental state. Feel free to try it out, but be aware that minimal testing and
-benchmarking was done.
-
-> Warning: This extension currently builds with the main branch of DuckDB. A PR is being worked on. When the PR is merged,
-this extension will be updated and usable from (nightly) DuckDB releases.
+> **Disclaimer:** This extension is currently in an experimental state. Feel free to try it out, but be aware that things may not work as expected
 
 # DuckDB extension for Apache Iceberg 
 
