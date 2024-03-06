@@ -13,7 +13,7 @@
 namespace duckdb {
 
 IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs,
-                                bool allow_moved_paths) {
+                                bool allow_moved_paths, string metadata_compression_codec) {
 	IcebergTable ret;
 	ret.path = iceberg_path;
 	ret.snapshot = snapshot;
@@ -118,8 +118,8 @@ unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(yyjson_doc &metadata
 	return make_uniq<SnapshotParseInfo>(std::move(info));
 }
 
-unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(const string &path, FileSystem &fs) {
-	auto metadata_json = ReadMetaData(path, fs);
+unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(const string &path, FileSystem &fs, string metadata_compression_codec) {
+	auto metadata_json = ReadMetaData(path, fs, metadata_compression_codec);
 	auto doc = yyjson_read(metadata_json.c_str(), metadata_json.size(), 0);
 	auto parse_info = GetParseInfo(*doc);
 
@@ -130,61 +130,72 @@ unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(const string &path, 
 	return std::move(parse_info);
 }
 
-IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(const string &path, FileSystem &fs) {
-	auto info = GetParseInfo(path, fs);
+IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(const string &path, FileSystem &fs, string metadata_compression_codec) {
+	auto info = GetParseInfo(path, fs, metadata_compression_codec);
 	auto latest_snapshot = FindLatestSnapshotInternal(info->snapshots);
 
 	if (!latest_snapshot) {
 		throw IOException("No snapshots found");
 	}
 
-	return ParseSnapShot(latest_snapshot, info->iceberg_version, info->schema_id, info->schemas);
+	return ParseSnapShot(latest_snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec);
 }
 
-IcebergSnapshot IcebergSnapshot::GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id) {
-	auto info = GetParseInfo(path, fs);
+IcebergSnapshot IcebergSnapshot::GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id, string metadata_compression_codec) {
+	auto info = GetParseInfo(path, fs, metadata_compression_codec);
 	auto snapshot = FindSnapshotByIdInternal(info->snapshots, snapshot_id);
 
 	if (!snapshot) {
 		throw IOException("Could not find snapshot with id " + to_string(snapshot_id));
 	}
 
-	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas);
+	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec);
 }
 
-IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp) {
-	auto info = GetParseInfo(path, fs);
+IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp, string metadata_compression_codec) {
+	auto info = GetParseInfo(path, fs, metadata_compression_codec);
 	auto snapshot = FindSnapshotByIdTimestampInternal(info->snapshots, timestamp);
 
 	if (!snapshot) {
 		throw IOException("Could not find latest snapshots for timestamp " + Timestamp::ToString(timestamp));
 	}
 
-	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas);
+	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec);
 }
 
-string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs) {
+string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string metadata_compression_codec) {
 	string metadata_file_path;
-
+	printf("got metadata_compression_codec=%s\n", metadata_compression_codec.c_str());
 	if (StringUtil::EndsWith(path, ".json")) {
 		metadata_file_path = path;
-	} else {
-		auto table_version = GetTableVersion(path, fs);
-		auto meta_path = fs.JoinPath(path, "metadata");
-		metadata_file_path = fs.JoinPath(meta_path, "v" + table_version + ".metadata.json");
+		// check if metadata is gz compressed file?
+		if (metadata_compression_codec == "gzip") {
+			return IcebergUtils::GzFileToString(metadata_file_path, fs);
+		}
+		return IcebergUtils::FileToString(metadata_file_path, fs);
 	}
-
-	return IcebergUtils::FileToString(metadata_file_path, fs);
+	auto table_version = GetTableVersion(path, fs);
+	auto meta_path = fs.JoinPath(path, "metadata");
+	metadata_file_path = fs.JoinPath(meta_path, "v" + table_version + ".metadata.json");
+	if (metadata_compression_codec == "gzip") {
+		// try with gz metadata file
+		metadata_file_path = fs.JoinPath(meta_path, "v" + table_version + ".gz.metadata.json");
+		// attempting to return file content as gz compressed json string.
+		return IcebergUtils::GzFileToString(metadata_file_path, fs);
+	} else {
+		// attempting to return file content as json string.
+		return IcebergUtils::FileToString(metadata_file_path, fs);
+	}
 }
 
 IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
-                                               vector<yyjson_val *> &schemas) {
+                                               vector<yyjson_val *> &schemas, string metadata_compression_codec) {
 	IcebergSnapshot ret;
 	auto snapshot_tag = yyjson_get_tag(snapshot);
 	if (snapshot_tag != YYJSON_TYPE_OBJ) {
 		throw IOException("Invalid snapshot field found parsing iceberg metadata.json");
 	}
-
+	ret.metadata_compression_codec = metadata_compression_codec;
 	if (iceberg_format_version == 1) {
 		ret.sequence_number = 0;
 	} else if (iceberg_format_version == 2) {

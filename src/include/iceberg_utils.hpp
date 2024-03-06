@@ -18,7 +18,8 @@ class IcebergUtils {
 public:
 	//! Downloads a file fully into a string
 	static string FileToString(const string &path, FileSystem &fs);
-
+	//! Downloads a gz file fully into a string
+	static string GzFileToString(const string &path, FileSystem &fs);
 	//! Somewhat hacky function that allows relative paths in iceberg tables to be resolved,
 	//! used for the allow_moved_paths debug option which allows us to test with iceberg tables that
 	//! were moved without their paths updated
