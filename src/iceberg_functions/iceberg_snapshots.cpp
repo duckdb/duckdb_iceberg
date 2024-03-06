@@ -56,7 +56,6 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 			metadata_compression_codec = StringValue::Get(kv.second);
 		}
 	}
-
 	bind_data->filename = input.inputs[0].ToString();
 	bind_data->metadata_compression_codec = metadata_compression_codec;
 
@@ -75,6 +74,10 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	return std::move(bind_data);
 }
 
+static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput &data,
+                                                    vector<LogicalType> &return_types, vector<string> &names) {
+
+}
 // Snapshots function
 static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
 	auto &global_state = data.global_state->Cast<IcebergSnapshotGlobalTableFunctionState>();
@@ -104,6 +107,7 @@ TableFunctionSet IcebergFunctions::GetIcebergSnapshotsFunction() {
 	TableFunctionSet function_set("iceberg_snapshots");
 	TableFunction table_function({LogicalType::VARCHAR}, IcebergSnapshotsFunction, IcebergSnapshotsBind,
 	                             IcebergSnapshotGlobalTableFunctionState::Init);
+	table_function.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	function_set.AddFunction(table_function);
 	return std::move(function_set);
 }
