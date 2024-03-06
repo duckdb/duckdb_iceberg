@@ -165,7 +165,6 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, File
 
 string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string metadata_compression_codec) {
 	string metadata_file_path;
-	printf("got metadata_compression_codec=%s\n", metadata_compression_codec.c_str());
 	if (StringUtil::EndsWith(path, ".json")) {
 		metadata_file_path = path;
 		// check if metadata is gz compressed file?
