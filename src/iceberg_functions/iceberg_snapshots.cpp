@@ -13,6 +13,7 @@ struct IcebergSnaphotsBindData : public TableFunctionData {
 	IcebergSnaphotsBindData() {};
 	string filename;
 	string metadata_compression_codec;
+	bool skip_schema_inference = false;
 };
 
 struct IcebergSnapshotGlobalTableFunctionState : public GlobalTableFunctionState {
@@ -49,15 +50,19 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	auto bind_data = make_uniq<IcebergSnaphotsBindData>();
 	
 	string metadata_compression_codec = "none";
+	bool skip_schema_inference = false;
 	
 	for (auto &kv : input.named_parameters) {
 		auto loption = StringUtil::Lower(kv.first);
 		if (loption == "metadata_compression_codec") {
 			metadata_compression_codec = StringValue::Get(kv.second);
+		} else if (loption == "skip_schema_inference") {
+			skip_schema_inference = BooleanValue::Get(kv.second);
 		}
 	}
 	bind_data->filename = input.inputs[0].ToString();
 	bind_data->metadata_compression_codec = metadata_compression_codec;
+	bind_data->skip_schema_inference = skip_schema_inference;
 
 	names.emplace_back("sequence_number");
 	return_types.emplace_back(LogicalType::UBIGINT);
@@ -88,9 +93,11 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 			break;
 		}
 
+
 		auto parse_info = IcebergSnapshot::GetParseInfo(*global_state.metadata_doc);
 		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot, global_state.iceberg_format_version,
-		                                               parse_info->schema_id, parse_info->schemas, bind_data.metadata_compression_codec);
+		                                               parse_info->schema_id, parse_info->schemas, bind_data.metadata_compression_codec,
+													   bind_data.skip_schema_inference);
 
 		FlatVector::GetData<int64_t>(output.data[0])[i] = snapshot.sequence_number;
 		FlatVector::GetData<int64_t>(output.data[1])[i] = snapshot.snapshot_id;
@@ -108,6 +115,7 @@ TableFunctionSet IcebergFunctions::GetIcebergSnapshotsFunction() {
 	TableFunction table_function({LogicalType::VARCHAR}, IcebergSnapshotsFunction, IcebergSnapshotsBind,
 	                             IcebergSnapshotGlobalTableFunctionState::Init);
 	table_function.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
+	table_function.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	function_set.AddFunction(table_function);
 	return std::move(function_set);
 }
