@@ -59,12 +59,12 @@ public:
 	vector<IcebergColumnDefinition> schema;
 	string metadata_compression_codec = "none";
 
-	static IcebergSnapshot GetLatestSnapshot(const string &path, FileSystem &fs, string GetSnapshotByTimestamp);
-	static IcebergSnapshot GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id, string GetSnapshotByTimestamp);
-	static IcebergSnapshot GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp, string GetSnapshotByTimestamp);
+	static IcebergSnapshot GetLatestSnapshot(const string &path, FileSystem &fs, string GetSnapshotByTimestamp, bool skip_schema_inference);
+	static IcebergSnapshot GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id, string GetSnapshotByTimestamp, bool skip_schema_inference);
+	static IcebergSnapshot GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp, string GetSnapshotByTimestamp, bool skip_schema_inference);
 
 	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
-	                                     vector<yyjson_val *> &schemas, string metadata_compression_codec);
+	                                     vector<yyjson_val *> &schemas, string metadata_compression_codec, bool skip_schema_inference);
 	static string ReadMetaData(const string &path, FileSystem &fs, string GetSnapshotByTimestamp);
 	static yyjson_val *GetSnapshots(const string &path, FileSystem &fs, string GetSnapshotByTimestamp);
 	static unique_ptr<SnapshotParseInfo> GetParseInfo(yyjson_doc &metadata_json);

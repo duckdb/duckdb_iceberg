@@ -129,16 +129,18 @@ static Value GetParquetSchemaParam(vector<IcebergColumnDefinition> &schema) {
 
 //! Build the Parquet Scan expression for the files we need to scan
 static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, vector<Value> &delete_file_values,
-                                               vector<IcebergColumnDefinition> &schema, bool allow_moved_paths, string metadata_compression_codec) {
+                                               vector<IcebergColumnDefinition> &schema, bool allow_moved_paths, string metadata_compression_codec, bool skip_schema_inference) {
 	// No deletes, just return a TableFunctionRef for a parquet scan of the data files
 	if (delete_file_values.empty()) {
 		auto table_function_ref_data = make_uniq<TableFunctionRef>();
 		table_function_ref_data->alias = "iceberg_scan_data";
 		vector<unique_ptr<ParsedExpression>> left_children;
 		left_children.push_back(make_uniq<ConstantExpression>(Value::LIST(data_file_values)));
-		left_children.push_back(
-		    make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("schema"),
-		                                    make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))));
+		if (!skip_schema_inference) {
+			left_children.push_back(
+					make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("schema"),
+					make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))));
+		}
 		table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
 		return std::move(table_function_ref_data);
 	}
@@ -169,10 +171,11 @@ static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, 
 	left_children.push_back(make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL,
 	                                                        make_uniq<ColumnRefExpression>("file_row_number"),
 	                                                        make_uniq<ConstantExpression>(Value(1))));
-	left_children.push_back(
-	    make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("schema"),
-	                                    make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))));
-
+	if (!skip_schema_inference) {
+		left_children.push_back(
+			make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("schema"),
+			make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))));
+	}
 	table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
 	join_node->left = std::move(table_function_ref_data);
 
@@ -208,6 +211,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	// this allows hive tables to be moved and have mismatching paths, usefull for testing, but will have worse
 	// performance
 	bool allow_moved_paths = false;
+	bool skip_schema_inference = false;
 	string mode = "default";
 	string metadata_compression_codec = "none";
 
@@ -223,21 +227,22 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 			mode = StringValue::Get(kv.second);
 		} else if (loption == "metadata_compression_codec") {
 			metadata_compression_codec = StringValue::Get(kv.second);
+		} else if (loption == "skip_schema_inference") {
+			skip_schema_inference = BooleanValue::Get(kv.second);
 		}
 	}
-
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
-			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>(), metadata_compression_codec);
+			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>(), metadata_compression_codec, skip_schema_inference);
 		} else if (input.inputs[1].type() == LogicalType::TIMESTAMP) {
 			snapshot_to_scan =
-			    IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>(), metadata_compression_codec);
+			    IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>(), metadata_compression_codec, skip_schema_inference);
 		} else {
 			throw InvalidInputException("Unknown argument type in IcebergScanBindReplace.");
 		}
 	} else {
-		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs, metadata_compression_codec);
+		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs, metadata_compression_codec, skip_schema_inference);
 	}
 
 	IcebergTable iceberg_table = IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths, metadata_compression_codec);
@@ -257,7 +262,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	if (mode == "list_files") {
 		return MakeListFilesExpression(data_file_values, delete_file_values);
 	} else if (mode == "default") {
-		return MakeScanExpression(data_file_values, delete_file_values, snapshot_to_scan.schema, allow_moved_paths, metadata_compression_codec);
+		return MakeScanExpression(data_file_values, delete_file_values, snapshot_to_scan.schema, allow_moved_paths, metadata_compression_codec, skip_schema_inference);
 	} else {
 		throw NotImplementedException("Unknown mode type for ICEBERG_SCAN bind : '" + mode + "'");
 	}
@@ -268,6 +273,7 @@ TableFunctionSet IcebergFunctions::GetIcebergScanFunction() {
 
 	auto fun = TableFunction({LogicalType::VARCHAR}, nullptr, nullptr, IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
+	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
 	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
@@ -276,6 +282,7 @@ TableFunctionSet IcebergFunctions::GetIcebergScanFunction() {
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::UBIGINT}, nullptr, nullptr,
 	                    IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
+	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
 	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
@@ -284,6 +291,7 @@ TableFunctionSet IcebergFunctions::GetIcebergScanFunction() {
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::TIMESTAMP}, nullptr, nullptr,
 	                    IcebergScanGlobalTableFunctionState::Init);
 	fun.bind_replace = IcebergScanBindReplace;
+	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
 	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
