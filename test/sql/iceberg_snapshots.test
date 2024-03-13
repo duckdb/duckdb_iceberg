@@ -22,3 +22,13 @@ statement error
 SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_nonexistent');
 ----
 IO Error: Cannot open file "data/iceberg/lineitem_iceberg_nonexistent/metadata/version-hint.text": No such file or directory
+
+statement error
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_gz');
+----
+IO Error: Cannot open file
+
+query IIII
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_gz', METADATA_COMPRESSION_CODEC="gzip");
+----
+0	4468019210336628573	2024-03-13 18:38:58.602	lineitem_iceberg_gz/metadata/snap-4468019210336628573-1-23f9dbea-1e7f-4694-a82c-dc3c9a94953e.avro
