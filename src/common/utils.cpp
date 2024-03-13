@@ -2,6 +2,7 @@
 #include "iceberg_utils.hpp"
 #include "zlib.h"
 #include "fstream"
+#include "duckdb/common/gzip_file_system.hpp"
 
 namespace duckdb {
 
@@ -18,35 +19,7 @@ string IcebergUtils::FileToString(const string &path, FileSystem &fs) {
 string IcebergUtils::GzFileToString(const string &path, FileSystem &fs) {
   // Initialize zlib variables
   string gzipped_string = FileToString(path, fs);
-  std::stringstream decompressed;
-    int CHUNK_SIZE = 16384;
-    z_stream zs;
-    zs.zalloc = Z_NULL;
-    zs.zfree = Z_NULL;
-    zs.opaque = Z_NULL;
-    zs.avail_in = gzipped_string.size();
-    zs.next_in = (Bytef *)gzipped_string.data();
-    int ret = inflateInit2(&zs, 16 + MAX_WBITS); // MAX_WBITS + 16 to enable gzip decoding
-    if (ret != Z_OK)
-    {
-        throw std::runtime_error("inflateInit failed");
-    }
-    do
-    {
-        char out[CHUNK_SIZE];
-        zs.avail_out = CHUNK_SIZE;
-        zs.next_out = (Bytef *)out;
-        ret = inflate(&zs, Z_NO_FLUSH);
-        if (ret < 0)
-        {
-            inflateEnd(&zs);
-            throw std::runtime_error("inflate failed with error code " + to_string(ret));
-        }
-        decompressed.write(out, CHUNK_SIZE - zs.avail_out);
-    } while (zs.avail_out == 0);
-    inflateEnd(&zs);
-    string ds = decompressed.str();
-    return ds;
+  return GZipFileSystem::UncompressGZIPString(gzipped_string);
 }
 
 string IcebergUtils::GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs) {
