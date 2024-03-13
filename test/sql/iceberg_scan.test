@@ -59,3 +59,13 @@ statement error
 FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', '2023-02-15 15:07:54.503'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);
 ----
 IO Error: Could not find latest snapshots for timestamp 2023-02-15 15:07:54.503
+
+statement error
+SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVED_PATHS=TRUE);
+----
+IO Error: Cannot open file
+
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVED_PATHS=TRUE, METADATA_COMPRESSION_CODEC="gzip");
+----
+111968
