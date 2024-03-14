@@ -163,28 +163,28 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, File
 	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec);
 }
 
+// Function to generate a metadata file url
+string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, const string &table_version, const string &metadata_compression_codec) {
+	if (metadata_compression_codec != "gzip") {
+		return fs.JoinPath(meta_path, "v" + table_version + ".metadata.json");
+	}
+	return fs.JoinPath(meta_path, "v" + table_version + ".gz.metadata.json");
+}
+
 string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string metadata_compression_codec) {
 	string metadata_file_path;
 	if (StringUtil::EndsWith(path, ".json")) {
 		metadata_file_path = path;
-		// check if metadata is gz compressed file?
-		if (metadata_compression_codec == "gzip") {
-			return IcebergUtils::GzFileToString(metadata_file_path, fs);
-		}
-		return IcebergUtils::FileToString(metadata_file_path, fs);
-	}
-	auto table_version = GetTableVersion(path, fs);
-	auto meta_path = fs.JoinPath(path, "metadata");
-	metadata_file_path = fs.JoinPath(meta_path, "v" + table_version + ".metadata.json");
-	if (metadata_compression_codec == "gzip") {
-		// try with gz metadata file
-		metadata_file_path = fs.JoinPath(meta_path, "v" + table_version + ".gz.metadata.json");
-		// attempting to return file content as gz compressed json string.
-		return IcebergUtils::GzFileToString(metadata_file_path, fs);
 	} else {
-		// attempting to return file content as json string.
-		return IcebergUtils::FileToString(metadata_file_path, fs);
+		auto table_version = GetTableVersion(path, fs);
+		auto meta_path = fs.JoinPath(path, "metadata");
+		metadata_file_path = GenerateMetaDataUrl(fs, meta_path, table_version, metadata_compression_codec);
 	}
+
+	if (metadata_compression_codec == "gzip") {
+		return IcebergUtils::GzFileToString(metadata_file_path, fs);
+	}
+	return IcebergUtils::FileToString(metadata_file_path, fs);
 }
 
 IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
