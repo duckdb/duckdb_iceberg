@@ -1,5 +1,8 @@
 #include "duckdb.hpp"
 #include "iceberg_utils.hpp"
+#include "zlib.h"
+#include "fstream"
+#include "duckdb/common/gzip_file_system.hpp"
 
 namespace duckdb {
 
@@ -10,6 +13,13 @@ string IcebergUtils::FileToString(const string &path, FileSystem &fs) {
 	string ret_val(file_size, ' ');
 	handle->Read((char *)ret_val.c_str(), file_size);
 	return ret_val;
+}
+
+// Function to decompress a gz file content string
+string IcebergUtils::GzFileToString(const string &path, FileSystem &fs) {
+  // Initialize zlib variables
+  string gzipped_string = FileToString(path, fs);
+  return GZipFileSystem::UncompressGZIPString(gzipped_string);
 }
 
 string IcebergUtils::GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs) {

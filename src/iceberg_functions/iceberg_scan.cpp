@@ -129,7 +129,7 @@ static Value GetParquetSchemaParam(vector<IcebergColumnDefinition> &schema) {
 
 //! Build the Parquet Scan expression for the files we need to scan
 static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, vector<Value> &delete_file_values,
-                                               vector<IcebergColumnDefinition> &schema, bool allow_moved_paths) {
+                                               vector<IcebergColumnDefinition> &schema, bool allow_moved_paths, string metadata_compression_codec) {
 	// No deletes, just return a TableFunctionRef for a parquet scan of the data files
 	if (delete_file_values.empty()) {
 		auto table_function_ref_data = make_uniq<TableFunctionRef>();
@@ -209,6 +209,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	// performance
 	bool allow_moved_paths = false;
 	string mode = "default";
+	string metadata_compression_codec = "none";
 
 	for (auto &kv : input.named_parameters) {
 		auto loption = StringUtil::Lower(kv.first);
@@ -220,24 +221,26 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 			}
 		} else if (loption == "mode") {
 			mode = StringValue::Get(kv.second);
+		} else if (loption == "metadata_compression_codec") {
+			metadata_compression_codec = StringValue::Get(kv.second);
 		}
 	}
 
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
-			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>());
+			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>(), metadata_compression_codec);
 		} else if (input.inputs[1].type() == LogicalType::TIMESTAMP) {
 			snapshot_to_scan =
-			    IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>());
+			    IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>(), metadata_compression_codec);
 		} else {
 			throw InvalidInputException("Unknown argument type in IcebergScanBindReplace.");
 		}
 	} else {
-		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs);
+		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs, metadata_compression_codec);
 	}
 
-	IcebergTable iceberg_table = IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths);
+	IcebergTable iceberg_table = IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths, metadata_compression_codec);
 	auto data_files = iceberg_table.GetPaths<IcebergManifestContentType::DATA>();
 	auto delete_files = iceberg_table.GetPaths<IcebergManifestContentType::DELETE>();
 	vector<Value> data_file_values;
@@ -254,7 +257,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	if (mode == "list_files") {
 		return MakeListFilesExpression(data_file_values, delete_file_values);
 	} else if (mode == "default") {
-		return MakeScanExpression(data_file_values, delete_file_values, snapshot_to_scan.schema, allow_moved_paths);
+		return MakeScanExpression(data_file_values, delete_file_values, snapshot_to_scan.schema, allow_moved_paths, metadata_compression_codec);
 	} else {
 		throw NotImplementedException("Unknown mode type for ICEBERG_SCAN bind : '" + mode + "'");
 	}
@@ -267,6 +270,7 @@ TableFunctionSet IcebergFunctions::GetIcebergScanFunction() {
 	fun.bind_replace = IcebergScanBindReplace;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
+	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	function_set.AddFunction(fun);
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::UBIGINT}, nullptr, nullptr,
@@ -274,6 +278,7 @@ TableFunctionSet IcebergFunctions::GetIcebergScanFunction() {
 	fun.bind_replace = IcebergScanBindReplace;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
+	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	function_set.AddFunction(fun);
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::TIMESTAMP}, nullptr, nullptr,
@@ -281,6 +286,7 @@ TableFunctionSet IcebergFunctions::GetIcebergScanFunction() {
 	fun.bind_replace = IcebergScanBindReplace;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["mode"] = LogicalType::VARCHAR;
+	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	function_set.AddFunction(fun);
 
 	return function_set;

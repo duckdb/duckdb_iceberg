@@ -55,30 +55,33 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 	auto iceberg_path = input.inputs[0].ToString();
 
 	bool allow_moved_paths = false;
-
+	string metadata_compression_codec = "none";
+	
 	for (auto &kv : input.named_parameters) {
 		auto loption = StringUtil::Lower(kv.first);
 		if (loption == "allow_moved_paths") {
 			allow_moved_paths = BooleanValue::Get(kv.second);
+		} else if (loption == "metadata_compression_codec") {
+			metadata_compression_codec = StringValue::Get(kv.second);
 		}
 	}
 
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
-			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>());
+			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>(), metadata_compression_codec);
 		} else if (input.inputs[1].type() == LogicalType::TIMESTAMP) {
 			snapshot_to_scan =
-			    IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>());
+			    IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>(), metadata_compression_codec);
 		} else {
 			throw InvalidInputException("Unknown argument type in IcebergScanBindReplace.");
 		}
 	} else {
-		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs);
+		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs, metadata_compression_codec);
 	}
 
 	ret->iceberg_table =
-	    make_uniq<IcebergTable>(IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths));
+	    make_uniq<IcebergTable>(IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths, metadata_compression_codec));
 
 	auto manifest_types = IcebergManifest::Types();
 	return_types.insert(return_types.end(), manifest_types.begin(), manifest_types.end());
@@ -139,16 +142,19 @@ TableFunctionSet IcebergFunctions::GetIcebergMetadataFunction() {
 	auto fun = TableFunction({LogicalType::VARCHAR}, IcebergMetaDataFunction, IcebergMetaDataBind,
 	                         IcebergMetaDataGlobalTableFunctionState::Init);
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
+	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	function_set.AddFunction(fun);
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::UBIGINT}, IcebergMetaDataFunction, IcebergMetaDataBind,
 	                    IcebergMetaDataGlobalTableFunctionState::Init);
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
+	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	function_set.AddFunction(fun);
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::TIMESTAMP}, IcebergMetaDataFunction, IcebergMetaDataBind,
 	                    IcebergMetaDataGlobalTableFunctionState::Init);
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
+	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	function_set.AddFunction(fun);
 
 	return function_set;
