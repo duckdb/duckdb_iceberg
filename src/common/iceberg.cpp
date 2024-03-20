@@ -130,7 +130,8 @@ unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(const string &path, 
 	return std::move(parse_info);
 }
 
-IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(const string &path, FileSystem &fs, string metadata_compression_codec) {
+IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(const string &path, FileSystem &fs,
+	string metadata_compression_codec, bool skip_schema_inference) {
 	auto info = GetParseInfo(path, fs, metadata_compression_codec);
 	auto latest_snapshot = FindLatestSnapshotInternal(info->snapshots);
 
@@ -138,10 +139,11 @@ IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(const string &path, FileSyste
 		throw IOException("No snapshots found");
 	}
 
-	return ParseSnapShot(latest_snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec);
+	return ParseSnapShot(latest_snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec, skip_schema_inference);
 }
 
-IcebergSnapshot IcebergSnapshot::GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id, string metadata_compression_codec) {
+IcebergSnapshot IcebergSnapshot::GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id,
+	string metadata_compression_codec, bool skip_schema_inference) {
 	auto info = GetParseInfo(path, fs, metadata_compression_codec);
 	auto snapshot = FindSnapshotByIdInternal(info->snapshots, snapshot_id);
 
@@ -149,10 +151,12 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotById(const string &path, FileSystem 
 		throw IOException("Could not find snapshot with id " + to_string(snapshot_id));
 	}
 
-	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec);
+	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas,
+		metadata_compression_codec, skip_schema_inference);
 }
 
-IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp, string metadata_compression_codec) {
+IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp, string metadata_compression_codec,
+	bool skip_schema_inference) {
 	auto info = GetParseInfo(path, fs, metadata_compression_codec);
 	auto snapshot = FindSnapshotByIdTimestampInternal(info->snapshots, timestamp);
 
@@ -160,7 +164,7 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, File
 		throw IOException("Could not find latest snapshots for timestamp " + Timestamp::ToString(timestamp));
 	}
 
-	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec);
+	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec, skip_schema_inference);
 }
 
 // Function to generate a metadata file url
@@ -188,7 +192,8 @@ string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string 
 }
 
 IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
-                                               vector<yyjson_val *> &schemas, string metadata_compression_codec) {
+                                               vector<yyjson_val *> &schemas, string metadata_compression_codec,
+											   bool skip_schema_inference) {
 	IcebergSnapshot ret;
 	auto snapshot_tag = yyjson_get_tag(snapshot);
 	if (snapshot_tag != YYJSON_TYPE_OBJ) {
@@ -206,8 +211,9 @@ IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t icebe
 	ret.manifest_list = IcebergUtils::TryGetStrFromObject(snapshot, "manifest-list");
 	ret.iceberg_format_version = iceberg_format_version;
 	ret.schema_id = schema_id;
-	ret.schema = ParseSchema(schemas, ret.schema_id);
-
+	if (!skip_schema_inference) {
+		ret.schema = ParseSchema(schemas, ret.schema_id);
+	}
 	return ret;
 }
 
