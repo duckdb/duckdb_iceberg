@@ -117,7 +117,7 @@ TableFunctionSet IcebergFunctions::GetIcebergSnapshotsFunction() {
 	table_function.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	table_function.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	function_set.AddFunction(table_function);
-	return std::move(function_set);
+	return function_set;
 }
 
 } // namespace duckdb
