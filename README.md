@@ -9,25 +9,6 @@ of an iceberg tables.
 
 See the [Iceberg page in the DuckDB documentation](https://duckdb.org/docs/extensions/iceberg).
 
-### External Data Catalog Support
-
-#### AWS Glue
-
-You can now access Iceberg Tables stored in a AWS Glue Catalog by passing a JSON formatted string to the `iceberg_scan()`
-function.
-
-This JSON object should be of this format:
-
-```json
-{
-  "catalog_type": "glue",
-  "catalog": "1234567890",          // optional - the catalog to use
-  "region": "us-east-1",            // required - change to the right region
-  "database_name": "test_iceberg",  // required - change to your database
-  "table_name": "table_name"        // required - change for each table.
-}
-```
-
 ## Developer guide
 
 ### Dependencies
