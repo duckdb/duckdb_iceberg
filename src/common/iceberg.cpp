@@ -18,12 +18,8 @@
 
 namespace duckdb {
 
-IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs,
-                                bool allow_moved_paths, string metadata_compression_codec) {
-	IcebergTable ret;
-	ret.path = iceberg_path;
-	ret.snapshot = snapshot;
-
+IcebergTable::IcebergTable(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs,
+                           bool allow_moved_paths, string metadata_compression_codec) : snapshot(snapshot), path(iceberg_path) {
 	auto manifest_list_full_path = allow_moved_paths
 	                                   ? IcebergUtils::GetFullPath(iceberg_path, snapshot.manifest_list, fs)
 	                                   : snapshot.manifest_list;
@@ -35,10 +31,8 @@ IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &sna
 		                                    : manifest.manifest_path;
 		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs, snapshot.iceberg_format_version);
 
-		ret.entries.push_back({std::move(manifest), std::move(manifest_paths)});
+		entries.push_back({std::move(manifest), std::move(manifest_paths)});
 	}
-
-	return ret;
 }
 
 vector<IcebergManifest> IcebergTable::ReadManifestListFile(const string &path, FileSystem &fs, idx_t iceberg_format_version) {
@@ -181,47 +175,28 @@ string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, const string
 	return fs.JoinPath(meta_path, "v" + table_version + ".gz.metadata.json");
 }
 
-static string CatalogTryGetStrFromObject(yyjson_val *obj, const string &field, bool required) {
-	auto val = yyjson_obj_getn(obj, field.c_str(), field.size());
-	if (!val) {
-		if (required) {
-			throw IOException("Property " + field + " was not found when parsing catalog information");
-		}
-		return "";
-	}
-
-	if (yyjson_get_type(val) != YYJSON_TYPE_STR) {
-		throw IOException("Value for " + field + " was not a string when parsing the catalog information.");
-	}
-	return yyjson_get_str(val);
-}
-
 // Read the current table metadata location from AWS Glue via the AWS SDK.
-static string ReadMetaDataFromAWSGlue(yyjson_val *root, FileSystem &fs, string metadata_compression_codec) {
-	auto region = CatalogTryGetStrFromObject(root, "region", true);
-	auto catalog = CatalogTryGetStrFromObject(root, "catalog", false);
-	auto database_name = CatalogTryGetStrFromObject(root, "database_name", true);
-	auto table_name = CatalogTryGetStrFromObject(root, "table_name", true);
-
+string IcebergSnapshot::ReadMetaDataFromAWSGlue(const string &path, FileSystem &fs, string metadata_compression_codec) {
 	Aws::SDKOptions options;
 	Aws::InitAPI(options);
 	try {
 		Aws::Client::ClientConfiguration config;
-		config.region = region;
+		config.region = this->region;
 
 		Aws::Glue::GlueClient glueClient(config);
 
 		Aws::Glue::Model::GetTableRequest request;
-		if (!catalog.empty()) {
-			request.SetCatalogId(catalog);
+		if (!this->catalog.empty()) {
+			request.SetCatalogId(this->catalog);
 		}
 
-		request.SetDatabaseName(database_name);
-		request.SetName(table_name);
+		request.SetDatabaseName(this->database_name);
+		request.SetName(path);
 
 		auto get_table_result = glueClient.GetTable(request);
 		if (!get_table_result.IsSuccess()) {
-			throw IOException("AWS Glue: Failed to get table in Glue catalog, check permissions?");
+			const Aws::Client::AWSError<Aws::Glue::GlueErrors>& error = get_table_result.GetError();
+			throw IOException("AWS Glue: Error calling GetTable API for table " + path + " " + error.GetExceptionName() + " - " + error.GetMessage());
 		}
 		const Aws::Glue::Model::Table& table = get_table_result.GetResult().GetTable();
 
@@ -245,45 +220,12 @@ static string ReadMetaDataFromAWSGlue(yyjson_val *root, FileSystem &fs, string m
 	}
 }
 
-// Read the metadata via the method that is specified using json.
-//
-// Right now this is just the AWS Glue data catalog.
-static string ReadMetaDataViaJSONSpec(const string &path, FileSystem &fs, string metadata_compression_codec) {
-	// This could be a JSON string of the catalog information.
-	// lets parse it with yyjson.
-
-	// Parse the JSON that the user has supplied, presume that its an object.
-	yyjson_doc *doc = yyjson_read(path.c_str(), path.length(), 0);
-	try {
-		yyjson_val *root = yyjson_doc_get_root(doc);
-		if(yyjson_get_type(root) != YYJSON_TYPE_OBJ) {
-			throw IOException("Iceberg metadata spec is not a JSON object, see docs.");
-		}
-
-		auto catalog_type = CatalogTryGetStrFromObject(root, "catalog_type", true);
-
-		// FIXME: in the future support these additional catalog types.
-		//
-		// - dynamodb - https://iceberg.apache.org/docs/1.5.0/aws/#dynamodb-catalog
-		// - REST/nessie - https://app.swaggerhub.com/apis/projectnessie/nessie/0.79.0#/v1/getContent
-		// - attached sql database. - https://iceberg.apache.org/docs/1.5.0/aws/#rds-jdbc-catalog
-		if (catalog_type == "glue") {
-			return ReadMetaDataFromAWSGlue(root, fs, metadata_compression_codec);
-		} else {
-			throw IOException("Unknown catalog type specified: " + catalog_type + ", valid types are ['glue']");
-		}
-	} catch(Exception &exception) {
-	  yyjson_doc_free(doc);
-	  throw exception;
-	}
-	throw IOException("Failed to obtain metadata from remote catalog.");
-}
 
 string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string metadata_compression_codec) {
 	// If the path starts with a { it is presumed to be a JSON encoded representation of a remote
 	// iceberg catalog.
-	if(StringUtil::StartsWith(path, "{")) {
-		return ReadMetaDataViaJSONSpec(path, fs, metadata_compression_codec);
+	if (catalog_type == "glue") {
+		return ReadMetaDataFromAWSGlue(path, fs, metadata_compression_codec);
 	}
 
 	string metadata_file_path;
@@ -303,8 +245,8 @@ string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string 
 
 IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
                                                vector<yyjson_val *> &schemas, string metadata_compression_codec,
-											   bool skip_schema_inference) {
-	IcebergSnapshot ret;
+                                               bool skip_schema_inference) {
+	IcebergSnapshot ret(catalog_type, catalog, region, database_name);
 	auto snapshot_tag = yyjson_get_type(snapshot);
 	if (snapshot_tag != YYJSON_TYPE_OBJ) {
 		throw IOException("Invalid snapshot field found parsing iceberg metadata.json");

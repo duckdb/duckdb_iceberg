@@ -57,7 +57,12 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 	bool allow_moved_paths = false;
 	string metadata_compression_codec = "none";
 	bool skip_schema_inference = false;
-	
+
+	string catalog_type = "";
+	string catalog = "";
+	string region = "";
+	string database_name = "";
+
 	for (auto &kv : input.named_parameters) {
 		auto loption = StringUtil::Lower(kv.first);
 		if (loption == "allow_moved_paths") {
@@ -66,24 +71,32 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 			metadata_compression_codec = StringValue::Get(kv.second);
 		} else if (loption == "skip_schema_inference") {
 			skip_schema_inference = BooleanValue::Get(kv.second);
+		} else if (loption == "catalog_type") {
+			catalog_type = StringValue::Get(kv.second);
+		} else if (loption == "catalog") {
+			catalog = StringValue::Get(kv.second);
+		} else if (loption == "region") {
+			region = StringValue::Get(kv.second);
+		} else if (loption == "database_name") {
+			database_name = StringValue::Get(kv.second);
 		}
 	}
-	IcebergSnapshot snapshot_to_scan;
+	IcebergSnapshot snapshot_to_scan(catalog_type, catalog, region, database_name);
+
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {
-			snapshot_to_scan = IcebergSnapshot::GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>(), metadata_compression_codec, skip_schema_inference);
+			snapshot_to_scan = snapshot_to_scan.GetSnapshotById(iceberg_path, fs, input.inputs[1].GetValue<uint64_t>(), metadata_compression_codec, skip_schema_inference);
 		} else if (input.inputs[1].type() == LogicalType::TIMESTAMP) {
 			snapshot_to_scan =
-			    IcebergSnapshot::GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>(), metadata_compression_codec, skip_schema_inference);
+			    snapshot_to_scan.GetSnapshotByTimestamp(iceberg_path, fs, input.inputs[1].GetValue<timestamp_t>(), metadata_compression_codec, skip_schema_inference);
 		} else {
 			throw InvalidInputException("Unknown argument type in IcebergScanBindReplace.");
 		}
 	} else {
-		snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_path, fs, metadata_compression_codec, skip_schema_inference);
+		snapshot_to_scan = snapshot_to_scan.GetLatestSnapshot(iceberg_path, fs, metadata_compression_codec, skip_schema_inference);
 	}
 
-	ret->iceberg_table =
-	    make_uniq<IcebergTable>(IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths, metadata_compression_codec));
+	ret->iceberg_table = make_uniq<IcebergTable>(IcebergTable(iceberg_path, snapshot_to_scan, fs, allow_moved_paths, metadata_compression_codec));
 
 	auto manifest_types = IcebergManifest::Types();
 	return_types.insert(return_types.end(), manifest_types.begin(), manifest_types.end());
@@ -146,6 +159,12 @@ TableFunctionSet IcebergFunctions::GetIcebergMetadataFunction() {
 	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
+
+	fun.named_parameters["catalog_type"] = LogicalType::VARCHAR;
+	fun.named_parameters["catalog"] = LogicalType::VARCHAR;
+	fun.named_parameters["region"] = LogicalType::VARCHAR;
+	fun.named_parameters["database_name"] = LogicalType::VARCHAR;
+
 	function_set.AddFunction(fun);
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::UBIGINT}, IcebergMetaDataFunction, IcebergMetaDataBind,
@@ -153,6 +172,12 @@ TableFunctionSet IcebergFunctions::GetIcebergMetadataFunction() {
 	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
+
+	fun.named_parameters["catalog_type"] = LogicalType::VARCHAR;
+	fun.named_parameters["catalog"] = LogicalType::VARCHAR;
+	fun.named_parameters["region"] = LogicalType::VARCHAR;
+	fun.named_parameters["database_name"] = LogicalType::VARCHAR;
+
 	function_set.AddFunction(fun);
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::TIMESTAMP}, IcebergMetaDataFunction, IcebergMetaDataBind,
@@ -160,6 +185,12 @@ TableFunctionSet IcebergFunctions::GetIcebergMetadataFunction() {
 	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
 	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
+
+	fun.named_parameters["catalog_type"] = LogicalType::VARCHAR;
+	fun.named_parameters["catalog"] = LogicalType::VARCHAR;
+	fun.named_parameters["region"] = LogicalType::VARCHAR;
+	fun.named_parameters["database_name"] = LogicalType::VARCHAR;
+
 	function_set.AddFunction(fun);
 
 	return function_set;
