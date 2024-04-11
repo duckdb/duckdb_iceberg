@@ -10,6 +10,12 @@
 #include "avro/ValidSchema.hh"
 #include "avro/Stream.hh"
 
+#include <regex>
+#include <aws/core/Aws.h>
+#include <aws/glue/GlueClient.h>
+#include <aws/glue/model/GetTableRequest.h>
+#include <aws/glue/model/GetTableResult.h>
+
 namespace duckdb {
 
 IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs,
@@ -175,7 +181,111 @@ string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, const string
 	return fs.JoinPath(meta_path, "v" + table_version + ".gz.metadata.json");
 }
 
+static string CatalogTryGetStrFromObject(yyjson_val *obj, const string &field, bool required) {
+	auto val = yyjson_obj_getn(obj, field.c_str(), field.size());
+	if (!val) {
+		if (required) {
+			throw IOException("Property " + field + " was not found when parsing catalog information");
+		}
+		return "";
+	}
+
+	if (yyjson_get_type(val) != YYJSON_TYPE_STR) {
+		throw IOException("Value for " + field + " was not a string when parsing the catalog information.");
+	}
+	return yyjson_get_str(val);
+}
+
+// Read the current table metadata location from AWS Glue via the AWS SDK.
+static string ReadMetaDataFromAWSGlue(yyjson_val *root, FileSystem &fs, string metadata_compression_codec) {
+	auto region = CatalogTryGetStrFromObject(root, "region", true);
+	auto catalog = CatalogTryGetStrFromObject(root, "catalog", false);
+	auto database_name = CatalogTryGetStrFromObject(root, "database_name", true);
+	auto table_name = CatalogTryGetStrFromObject(root, "table_name", true);
+
+	Aws::SDKOptions options;
+	Aws::InitAPI(options);
+	try {
+		Aws::Client::ClientConfiguration config;
+		config.region = region;
+
+		Aws::Glue::GlueClient glueClient(config);
+
+		Aws::Glue::Model::GetTableRequest request;
+		if (!catalog.empty()) {
+			request.SetCatalogId(catalog);
+		}
+
+		request.SetDatabaseName(database_name);
+		request.SetName(table_name);
+
+		auto get_table_result = glueClient.GetTable(request);
+		if (!get_table_result.IsSuccess()) {
+			throw IOException("AWS Glue: Failed to get table in Glue catalog, check permissions?");
+		}
+		const Aws::Glue::Model::Table& table = get_table_result.GetResult().GetTable();
+
+		const Aws::Map<Aws::String, Aws::String>& table_parameters = table.GetParameters();
+		auto table_type = table_parameters.find("table_type");
+		if (table_type == table_parameters.end()) {
+			throw IOException("AWS Glue: table_type is not defined for table, is it an Iceberg table?");
+		}
+		if (table_type->second != "ICEBERG") {
+			throw IOException("AWS Glue: type_type is not set to 'ICEBERG', is this an Iceberg table?");
+		}
+		auto table_metadata_location = table_parameters.find("metadata_location");
+		if(table_metadata_location == table_parameters.end()) {
+			throw IOException("AWS Glue: No Iceberg metadata location is specified for the table.");
+		}
+		Aws::ShutdownAPI(options);
+		return IcebergUtils::FileToString(table_metadata_location->second, fs);
+	} catch(Exception &exception) {
+		Aws::ShutdownAPI(options);
+		throw exception;
+	}
+}
+
+// Read the metadata via the method that is specified using json.
+//
+// Right now this is just the AWS Glue data catalog.
+static string ReadMetaDataViaJSONSpec(const string &path, FileSystem &fs, string metadata_compression_codec) {
+	// This could be a JSON string of the catalog information.
+	// lets parse it with yyjson.
+
+	// Parse the JSON that the user has supplied, presume that its an object.
+	yyjson_doc *doc = yyjson_read(path.c_str(), path.length(), 0);
+	try {
+		yyjson_val *root = yyjson_doc_get_root(doc);
+		if(yyjson_get_type(root) != YYJSON_TYPE_OBJ) {
+			throw IOException("Iceberg metadata spec is not a JSON object, see docs.");
+		}
+
+		auto catalog_type = CatalogTryGetStrFromObject(root, "catalog_type", true);
+
+		// FIXME: in the future support these additional catalog types.
+		//
+		// - dynamodb - https://iceberg.apache.org/docs/1.5.0/aws/#dynamodb-catalog
+		// - REST/nessie - https://app.swaggerhub.com/apis/projectnessie/nessie/0.79.0#/v1/getContent
+		// - attached sql database. - https://iceberg.apache.org/docs/1.5.0/aws/#rds-jdbc-catalog
+		if (catalog_type == "glue") {
+			return ReadMetaDataFromAWSGlue(root, fs, metadata_compression_codec);
+		} else {
+			throw IOException("Unknown catalog type specified: " + catalog_type + ", valid types are ['glue']");
+		}
+	} catch(Exception &exception) {
+	  yyjson_doc_free(doc);
+	  throw exception;
+	}
+	throw IOException("Failed to obtain metadata from remote catalog.");
+}
+
 string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string metadata_compression_codec) {
+	// If the path starts with a { it is presumed to be a JSON encoded representation of a remote
+	// iceberg catalog.
+	if(StringUtil::StartsWith(path, "{")) {
+		return ReadMetaDataViaJSONSpec(path, fs, metadata_compression_codec);
+	}
+
 	string metadata_file_path;
 	if (StringUtil::EndsWith(path, ".json")) {
 		metadata_file_path = path;
