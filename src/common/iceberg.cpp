@@ -127,7 +127,7 @@ unique_ptr<SnapshotParseInfo> IcebergSnapshot::GetParseInfo(const string &path, 
 	parse_info->doc = doc;
 	parse_info->document = std::move(metadata_json);
 
-	return std::move(parse_info);
+	return parse_info;
 }
 
 IcebergSnapshot IcebergSnapshot::GetLatestSnapshot(const string &path, FileSystem &fs,

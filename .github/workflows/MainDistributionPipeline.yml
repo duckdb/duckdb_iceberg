@@ -17,7 +17,7 @@ jobs:
     uses: duckdb/duckdb/.github/workflows/_extension_distribution.yml@v0.10.1
     with:
       extension_name: iceberg
-      duckdb_version: 'v0.10.1'
+      duckdb_version: main
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;windows_amd64_rtools'
 
   duckdb-stable-deploy:
@@ -27,6 +27,6 @@ jobs:
     secrets: inherit
     with:
       extension_name: iceberg
-      duckdb_version: 'v0.10.1'
+      duckdb_version: 'main'
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;windows_amd64_rtools'
       deploy_latest: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}

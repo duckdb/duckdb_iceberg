@@ -16,12 +16,6 @@
 namespace duckdb {
 
 static void LoadInternal(DatabaseInstance &instance) {
-	Connection con(instance);
-	con.BeginTransaction();
-	auto &context = *con.context;
-
-	auto &catalog = Catalog::GetSystemCatalog(*con.context);
-
 	// Iceberg Table Functions
 	for (auto &fun : IcebergFunctions::GetTableFunctions()) {
 		ExtensionUtil::RegisterFunction(instance, fun);
@@ -31,8 +25,6 @@ static void LoadInternal(DatabaseInstance &instance) {
 	for (auto &fun : IcebergFunctions::GetScalarFunctions()) {
 		ExtensionUtil::RegisterFunction(instance, fun);
 	}
-
-	con.Commit();
 }
 
 void IcebergExtension::Load(DuckDB &db) {
