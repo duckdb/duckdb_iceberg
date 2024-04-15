@@ -47,6 +47,9 @@ set_target_properties(
   PROPERTIES IMPORTED_LOCATION ${AVROCPP_LIBRARY_DEBUG}
              INTERFACE_INCLUDE_DIRECTORIES ${AVROCPP_INCLUDE_DIR})
 
+# For the Glue catalog support.
+find_package(AWSSDK REQUIRED COMPONENTS core;glue)
+
 # Note: for some reason avro-cpp port does properly handle static deps, so we
 # need to manually ensure avro's deps are linked too
 set(SNAPPY_HOME "${AVROCPP_ROOT_FIND_DIR}")
@@ -55,6 +58,9 @@ find_package(Boost REQUIRED COMPONENTS iostreams program_options system
                                        filesystem)
 find_package(Snappy CONFIG REQUIRED)
 find_package(ZLIB REQUIRED)
+
+target_include_directories(${EXTENSION_NAME}
+                           PUBLIC $<BUILD_INTERFACE:${AWSSDK_INCLUDE_DIRS}>)
 target_link_libraries(
   avro_static_release
   INTERFACE Boost::boost
@@ -76,9 +82,9 @@ target_link_libraries(
 
 # Link dependencies into extension
 target_link_libraries(${EXTENSION_NAME} PUBLIC optimized avro_static_release
-                                               debug avro_static_debug)
+                                               debug avro_static_debug ${AWSSDK_LINK_LIBRARIES})
 target_link_libraries(${TARGET_NAME}_loadable_extension optimized
-                      avro_static_release debug avro_static_debug)
+                      avro_static_release debug avro_static_debug ${AWSSDK_LINK_LIBRARIES})
 
 install(
   TARGETS ${EXTENSION_NAME} ${TARGET_NAME}_loadable_extension

@@ -14,6 +14,10 @@ struct IcebergSnaphotsBindData : public TableFunctionData {
 	string filename;
 	string metadata_compression_codec;
 	bool skip_schema_inference = false;
+	string catalog_type = "";
+	string catalog = "";
+	string region = "";
+	string database_name = "";
 };
 
 struct IcebergSnapshotGlobalTableFunctionState : public GlobalTableFunctionState {
@@ -24,12 +28,15 @@ public:
 		}
 	}
 	static unique_ptr<GlobalTableFunctionState> Init(ClientContext &context, TableFunctionInitInput &input) {
-		
+
 		auto bind_data = input.bind_data->Cast<IcebergSnaphotsBindData>();
 		auto global_state = make_uniq<IcebergSnapshotGlobalTableFunctionState>();
-		
+
 		FileSystem &fs = FileSystem::GetFileSystem(context);
-		global_state->metadata_file = IcebergSnapshot::ReadMetaData(bind_data.filename, fs,  bind_data.metadata_compression_codec);
+
+		IcebergSnapshot snapshot(bind_data.catalog_type, bind_data.catalog, bind_data.region, bind_data.database_name);
+
+		global_state->metadata_file = snapshot.ReadMetaData(bind_data.filename, fs, bind_data.metadata_compression_codec);
 		global_state->metadata_doc =
 		    yyjson_read(global_state->metadata_file.c_str(), global_state->metadata_file.size(), 0);
 		auto root = yyjson_doc_get_root(global_state->metadata_doc);
@@ -48,16 +55,29 @@ public:
 static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, TableFunctionBindInput &input,
                                                      vector<LogicalType> &return_types, vector<string> &names) {
 	auto bind_data = make_uniq<IcebergSnaphotsBindData>();
-	
+
 	string metadata_compression_codec = "none";
 	bool skip_schema_inference = false;
-	
+
+	string catalog_type = "";
+	string catalog = "";
+	string region = "";
+	string database_name = "";
+
 	for (auto &kv : input.named_parameters) {
 		auto loption = StringUtil::Lower(kv.first);
 		if (loption == "metadata_compression_codec") {
 			metadata_compression_codec = StringValue::Get(kv.second);
 		} else if (loption == "skip_schema_inference") {
 			skip_schema_inference = BooleanValue::Get(kv.second);
+		} else if (loption == "catalog_type") {
+			bind_data->catalog_type = StringValue::Get(kv.second);
+		} else if (loption == "catalog") {
+			bind_data->catalog = StringValue::Get(kv.second);
+		} else if (loption == "region") {
+			bind_data->region = StringValue::Get(kv.second);
+		} else if (loption == "database_name") {
+			bind_data->database_name = StringValue::Get(kv.second);
 		}
 	}
 	bind_data->filename = input.inputs[0].ToString();
@@ -87,6 +107,9 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput &data, DataChunk &output) {
 	auto &global_state = data.global_state->Cast<IcebergSnapshotGlobalTableFunctionState>();
 	auto &bind_data = data.bind_data->Cast<IcebergSnaphotsBindData>();
+
+	IcebergSnapshot base_snapshot(bind_data.catalog_type, bind_data.catalog, bind_data.region,
+	                              bind_data.database_name);
 	idx_t i = 0;
 	while (auto next_snapshot = yyjson_arr_iter_next(&global_state.snapshot_it)) {
 		if (i >= STANDARD_VECTOR_SIZE) {
@@ -95,9 +118,9 @@ static void IcebergSnapshotsFunction(ClientContext &context, TableFunctionInput 
 
 
 		auto parse_info = IcebergSnapshot::GetParseInfo(*global_state.metadata_doc);
-		auto snapshot = IcebergSnapshot::ParseSnapShot(next_snapshot, global_state.iceberg_format_version,
-		                                               parse_info->schema_id, parse_info->schemas, bind_data.metadata_compression_codec,
-													   bind_data.skip_schema_inference);
+		auto snapshot = base_snapshot.ParseSnapShot(next_snapshot, global_state.iceberg_format_version,
+                                                parse_info->schema_id, parse_info->schemas, bind_data.metadata_compression_codec,
+                                                bind_data.skip_schema_inference);
 
 		FlatVector::GetData<int64_t>(output.data[0])[i] = snapshot.sequence_number;
 		FlatVector::GetData<int64_t>(output.data[1])[i] = snapshot.snapshot_id;

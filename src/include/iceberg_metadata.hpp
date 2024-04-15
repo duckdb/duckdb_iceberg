@@ -59,13 +59,28 @@ public:
 	vector<IcebergColumnDefinition> schema;
 	string metadata_compression_codec = "none";
 
-	static IcebergSnapshot GetLatestSnapshot(const string &path, FileSystem &fs, string GetSnapshotByTimestamp, bool skip_schema_inference);
-	static IcebergSnapshot GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id, string GetSnapshotByTimestamp, bool skip_schema_inference);
-	static IcebergSnapshot GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp, string GetSnapshotByTimestamp, bool skip_schema_inference);
+	//! Support external catalog details.
+	string catalog_type = "";
+	string catalog = "";
+	string region = "";
+	string database_name = "";
 
-	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
-	                                     vector<yyjson_val *> &schemas, string metadata_compression_codec, bool skip_schema_inference);
-	static string ReadMetaData(const string &path, FileSystem &fs, string GetSnapshotByTimestamp);
+	IcebergSnapshot(const string &catalog_type, const string &catalog, const string &region, const string &database_name):
+		catalog_type(catalog_type), catalog(catalog), region(region), database_name(database_name) {
+
+	}
+
+	IcebergSnapshot(const IcebergSnapshot &other) : catalog_type(other.catalog_type), catalog(other.catalog), region(other.region), database_name(other.database_name) {
+	}
+
+
+	IcebergSnapshot GetLatestSnapshot(const string &path, FileSystem &fs, string GetSnapshotByTimestamp, bool skip_schema_inference);
+	IcebergSnapshot GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id, string GetSnapshotByTimestamp, bool skip_schema_inference);
+	IcebergSnapshot GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp, string GetSnapshotByTimestamp, bool skip_schema_inference);
+
+	IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
+										vector<yyjson_val *> &schemas, string metadata_compression_codec, bool skip_schema_inference);
+	string ReadMetaData(const string &path, FileSystem &fs, string GetSnapshotByTimestamp);
 	static yyjson_val *GetSnapshots(const string &path, FileSystem &fs, string GetSnapshotByTimestamp);
 	static unique_ptr<SnapshotParseInfo> GetParseInfo(yyjson_doc &metadata_json);
 
@@ -76,15 +91,19 @@ protected:
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);
 	static vector<IcebergColumnDefinition> ParseSchema(vector<yyjson_val *> &schemas, idx_t schema_id);
-	static unique_ptr<SnapshotParseInfo> GetParseInfo(const string &path, FileSystem &fs, string metadata_compression_codec);
+	unique_ptr<SnapshotParseInfo> GetParseInfo(const string &path, FileSystem &fs, string metadata_compression_codec);
+
+	//!Catalog functions
+	string ReadMetaDataFromAWSGlue(const string &path, FileSystem &fs, string metadata_compression_codec);
+
 };
 
 //! Represents the iceberg table at a specific IcebergSnapshot. Corresponds to a single Manifest List.
-struct IcebergTable {
+class IcebergTable {
 public:
 	//! Loads all(!) metadata of into IcebergTable object
-	static IcebergTable Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs,
-	                         bool allow_moved_paths = false, string metadata_compression_codec = "none");
+	IcebergTable(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs, bool allow_moved_paths = false,
+	             string metadata_compression_codec = "none");
 
 	//! Returns all paths to be scanned for the IcebergManifestContentType
 	template <IcebergManifestContentType TYPE>
@@ -112,7 +131,7 @@ public:
 	}
 
 	//! The snapshot of this table
-	IcebergSnapshot snapshot;
+	IcebergSnapshot &snapshot;
 	//! The entries (manifests) of this table
 	vector<IcebergTableEntry> entries;
 

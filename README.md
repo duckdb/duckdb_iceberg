@@ -1,6 +1,6 @@
 > **Disclaimer:** This extension is currently in an experimental state. Feel free to try it out, but be aware that things may not work as expected
 
-# DuckDB extension for Apache Iceberg 
+# DuckDB extension for Apache Iceberg
 
 This repository contains a DuckDB extension that adds support for [Apache Iceberg](https://iceberg.apache.org/). In its current state, the extension offers some basics features that allow listing snapshots and reading specific snapshots
 of an iceberg tables.
@@ -13,15 +13,15 @@ See the [Iceberg page in the DuckDB documentation](https://duckdb.org/docs/exten
 
 ### Dependencies
 
-This extension has several dependencies. Currently, the main way to install them is through vcpkg. To install vcpkg, 
+This extension has several dependencies. Currently, the main way to install them is through vcpkg. To install vcpkg,
 check out the docs [here](https://vcpkg.io/en/getting-started.html). Note that this extension contains a custom vcpkg port
 that overrides the existing 'avro-cpp' port of vcpkg. The reason for this is that the other versions of avro-cpp have
 some issue that seems to cause issues with the avro files produced by the spark iceberg extension.
 
 ### Test data generation
 
-To generate test data, the script in 'scripts/test_data_generator' is used to have spark generate some test data. This is 
-based on pyspark 3.5, which you can install through pip. 
+To generate test data, the script in 'scripts/test_data_generator' is used to have spark generate some test data. This is
+based on pyspark 3.5, which you can install through pip.
 
 ### Building the extension
 
@@ -53,7 +53,7 @@ running `python3 -m pip install duckdb pyspark[sql]==3.5.0` should do the trick.
 #### Running unit tests
 
 ```shell
-make test 
+make test
 ```
 
 #### Running the local S3 test server

@@ -1,6 +1,10 @@
 {
   "dependencies": [
     {
+      "name": "aws-sdk-cpp",
+      "features": ["glue"]
+    },
+    {
       "name": "avro-cpp",
       "features": ["snappy"]
     },

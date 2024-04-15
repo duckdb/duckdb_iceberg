@@ -9,7 +9,7 @@ namespace duckdb {
 static LogicalType ParseType(yyjson_val *type);
 
 static LogicalType ParseStruct(yyjson_val *struct_type) {
-	D_ASSERT(yyjson_get_tag(struct_type) == YYJSON_TYPE_OBJ);
+	D_ASSERT(yyjson_get_type(struct_type) == YYJSON_TYPE_OBJ);
 	D_ASSERT(IcebergUtils::TryGetStrFromObject(struct_type, "type") == "struct");
 
 	child_list_t<LogicalType> children;
@@ -28,7 +28,7 @@ static LogicalType ParseStruct(yyjson_val *struct_type) {
 }
 
 static LogicalType ParseList(yyjson_val *list_type) {
-	D_ASSERT(yyjson_get_tag(list_type) == YYJSON_TYPE_OBJ);
+	D_ASSERT(yyjson_get_type(list_type) == YYJSON_TYPE_OBJ);
 	D_ASSERT(IcebergUtils::TryGetStrFromObject(list_type, "type") == "list");
 
 	// NOTE: 'element-id', 'element-required' are ignored for now
@@ -38,7 +38,7 @@ static LogicalType ParseList(yyjson_val *list_type) {
 }
 
 static LogicalType ParseMap(yyjson_val *map_type) {
-	D_ASSERT(yyjson_get_tag(map_type) == YYJSON_TYPE_OBJ);
+	D_ASSERT(yyjson_get_type(map_type) == YYJSON_TYPE_OBJ);
 	D_ASSERT(IcebergUtils::TryGetStrFromObject(map_type, "type") == "map");
 
 	// NOTE: 'key-id', 'value-id', 'value-required' are ignored for now
@@ -51,7 +51,7 @@ static LogicalType ParseMap(yyjson_val *map_type) {
 }
 
 static LogicalType ParseComplexType(yyjson_val *type) {
-	D_ASSERT(yyjson_get_tag(type) == YYJSON_TYPE_OBJ);
+	D_ASSERT(yyjson_get_type(type) == YYJSON_TYPE_OBJ);
 	auto type_str = IcebergUtils::TryGetStrFromObject(type, "type");
 
 	if (type_str == "struct") {
@@ -73,10 +73,10 @@ static LogicalType ParseType(yyjson_val *type) {
 	if (!val) {
 		throw IOException("Invalid field found while parsing field: type");
 	}
-	if (yyjson_get_tag(val) == YYJSON_TYPE_OBJ) {
+	if (yyjson_get_type(val) == YYJSON_TYPE_OBJ) {
 		return ParseComplexType(val);
 	}
-	if (yyjson_get_tag(val) != YYJSON_TYPE_STR) {
+	if (yyjson_get_type(val) != YYJSON_TYPE_STR) {
 		throw IOException("Invalid field found while parsing field: type");
 	}
 
@@ -154,7 +154,7 @@ static vector<IcebergColumnDefinition> ParseSchemaFromJson(yyjson_val *schema_js
 	if (type_str != "struct") {
 		throw IOException("Schema in JSON Metadata is invalid");
 	}
-	D_ASSERT(yyjson_get_tag(schema_json) == YYJSON_TYPE_OBJ);
+	D_ASSERT(yyjson_get_type(schema_json) == YYJSON_TYPE_OBJ);
 	D_ASSERT(IcebergUtils::TryGetStrFromObject(schema_json, "type") == "struct");
 	yyjson_val *field;
 	size_t max, idx;

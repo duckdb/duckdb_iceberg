@@ -10,14 +10,16 @@
 #include "avro/ValidSchema.hh"
 #include "avro/Stream.hh"
 
+#include <regex>
+#include <aws/core/Aws.h>
+#include <aws/glue/GlueClient.h>
+#include <aws/glue/model/GetTableRequest.h>
+#include <aws/glue/model/GetTableResult.h>
+
 namespace duckdb {
 
-IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs,
-                                bool allow_moved_paths, string metadata_compression_codec) {
-	IcebergTable ret;
-	ret.path = iceberg_path;
-	ret.snapshot = snapshot;
-
+IcebergTable::IcebergTable(const string &iceberg_path, IcebergSnapshot &snapshot, FileSystem &fs,
+                           bool allow_moved_paths, string metadata_compression_codec) : snapshot(snapshot), path(iceberg_path) {
 	auto manifest_list_full_path = allow_moved_paths
 	                                   ? IcebergUtils::GetFullPath(iceberg_path, snapshot.manifest_list, fs)
 	                                   : snapshot.manifest_list;
@@ -29,10 +31,8 @@ IcebergTable IcebergTable::Load(const string &iceberg_path, IcebergSnapshot &sna
 		                                    : manifest.manifest_path;
 		auto manifest_paths = ReadManifestEntries(manifest_entry_full_path, fs, snapshot.iceberg_format_version);
 
-		ret.entries.push_back({std::move(manifest), std::move(manifest_paths)});
+		entries.push_back({std::move(manifest), std::move(manifest_paths)});
 	}
-
-	return ret;
 }
 
 vector<IcebergManifest> IcebergTable::ReadManifestListFile(const string &path, FileSystem &fs, idx_t iceberg_format_version) {
@@ -175,7 +175,59 @@ string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, const string
 	return fs.JoinPath(meta_path, "v" + table_version + ".gz.metadata.json");
 }
 
+// Read the current table metadata location from AWS Glue via the AWS SDK.
+string IcebergSnapshot::ReadMetaDataFromAWSGlue(const string &path, FileSystem &fs, string metadata_compression_codec) {
+	Aws::SDKOptions options;
+	Aws::InitAPI(options);
+	try {
+		Aws::Client::ClientConfiguration config;
+		config.region = this->region;
+
+		Aws::Glue::GlueClient glueClient(config);
+
+		Aws::Glue::Model::GetTableRequest request;
+		if (!this->catalog.empty()) {
+			request.SetCatalogId(this->catalog);
+		}
+
+		request.SetDatabaseName(this->database_name);
+		request.SetName(path);
+
+		auto get_table_result = glueClient.GetTable(request);
+		if (!get_table_result.IsSuccess()) {
+			const Aws::Client::AWSError<Aws::Glue::GlueErrors>& error = get_table_result.GetError();
+			throw IOException("AWS Glue: Error calling GetTable API for table " + path + " " + error.GetExceptionName() + " - " + error.GetMessage());
+		}
+		const Aws::Glue::Model::Table& table = get_table_result.GetResult().GetTable();
+
+		const Aws::Map<Aws::String, Aws::String>& table_parameters = table.GetParameters();
+		auto table_type = table_parameters.find("table_type");
+		if (table_type == table_parameters.end()) {
+			throw IOException("AWS Glue: table_type is not defined for table, is it an Iceberg table?");
+		}
+		if (table_type->second != "ICEBERG") {
+			throw IOException("AWS Glue: type_type is not set to 'ICEBERG', is this an Iceberg table?");
+		}
+		auto table_metadata_location = table_parameters.find("metadata_location");
+		if(table_metadata_location == table_parameters.end()) {
+			throw IOException("AWS Glue: No Iceberg metadata location is specified for the table.");
+		}
+		Aws::ShutdownAPI(options);
+		return IcebergUtils::FileToString(table_metadata_location->second, fs);
+	} catch(Exception &exception) {
+		Aws::ShutdownAPI(options);
+		throw exception;
+	}
+}
+
+
 string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string metadata_compression_codec) {
+	// If the path starts with a { it is presumed to be a JSON encoded representation of a remote
+	// iceberg catalog.
+	if (catalog_type == "glue") {
+		return ReadMetaDataFromAWSGlue(path, fs, metadata_compression_codec);
+	}
+
 	string metadata_file_path;
 	if (StringUtil::EndsWith(path, ".json")) {
 		metadata_file_path = path;
@@ -193,9 +245,9 @@ string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string 
 
 IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
                                                vector<yyjson_val *> &schemas, string metadata_compression_codec,
-											   bool skip_schema_inference) {
-	IcebergSnapshot ret;
-	auto snapshot_tag = yyjson_get_tag(snapshot);
+                                               bool skip_schema_inference) {
+	IcebergSnapshot ret(catalog_type, catalog, region, database_name);
+	auto snapshot_tag = yyjson_get_type(snapshot);
 	if (snapshot_tag != YYJSON_TYPE_OBJ) {
 		throw IOException("Invalid snapshot field found parsing iceberg metadata.json");
 	}
