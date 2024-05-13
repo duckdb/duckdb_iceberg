@@ -195,7 +195,7 @@ IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t icebe
                                                vector<yyjson_val *> &schemas, string metadata_compression_codec,
 											   bool skip_schema_inference) {
 	IcebergSnapshot ret;
-	auto snapshot_tag = yyjson_get_tag(snapshot);
+	auto snapshot_tag = yyjson_get_type(snapshot);
 	if (snapshot_tag != YYJSON_TYPE_OBJ) {
 		throw IOException("Invalid snapshot field found parsing iceberg metadata.json");
 	}
