@@ -12,6 +12,8 @@
 #include "yyjson.hpp"
 #include "iceberg_types.hpp"
 
+using namespace duckdb_yyjson;
+
 namespace duckdb {
 
 struct IcebergColumnDefinition {

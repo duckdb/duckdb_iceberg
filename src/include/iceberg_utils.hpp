@@ -12,6 +12,8 @@
 #include "iceberg_types.hpp"
 #include "yyjson.hpp"
 
+using namespace duckdb_yyjson;
+
 namespace duckdb {
 
 class IcebergUtils {
