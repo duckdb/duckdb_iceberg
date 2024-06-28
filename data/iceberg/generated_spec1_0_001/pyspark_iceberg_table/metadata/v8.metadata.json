@@ -1,0 +1,474 @@
+{
+  "format-version" : 1,
+  "table-uuid" : "2e23a4d3-2f64-47ac-aad6-f37df92836a1",
+  "location" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table",
+  "last-updated-ms" : 1719580923120,
+  "last-column-id" : 16,
+  "schema" : {
+    "type" : "struct",
+    "schema-id" : 1,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "l_orderkey_bool",
+      "required" : false,
+      "type" : "boolean"
+    }, {
+      "id" : 2,
+      "name" : "l_partkey_int",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 3,
+      "name" : "l_suppkey_long",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 4,
+      "name" : "l_extendedprice_float",
+      "required" : false,
+      "type" : "float"
+    }, {
+      "id" : 5,
+      "name" : "l_extendedprice_double",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "l_extendedprice_dec9_2",
+      "required" : false,
+      "type" : "decimal(9, 2)"
+    }, {
+      "id" : 7,
+      "name" : "l_extendedprice_dec18_6",
+      "required" : false,
+      "type" : "decimal(18, 6)"
+    }, {
+      "id" : 8,
+      "name" : "l_extendedprice_dec38_10",
+      "required" : false,
+      "type" : "decimal(38, 10)"
+    }, {
+      "id" : 9,
+      "name" : "l_shipdate_date",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 10,
+      "name" : "l_partkey_time",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 11,
+      "name" : "l_commitdate_timestamp",
+      "required" : false,
+      "type" : "timestamp"
+    }, {
+      "id" : 12,
+      "name" : "l_commitdate_timestamp_tz",
+      "required" : false,
+      "type" : "timestamptz"
+    }, {
+      "id" : 13,
+      "name" : "l_comment_string",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 14,
+      "name" : "uuid",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 15,
+      "name" : "l_comment_blob",
+      "required" : false,
+      "type" : "binary"
+    }, {
+      "id" : 16,
+      "name" : "schema_evol_added_col_1",
+      "required" : false,
+      "type" : "int"
+    } ]
+  },
+  "current-schema-id" : 1,
+  "schemas" : [ {
+    "type" : "struct",
+    "schema-id" : 0,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "l_orderkey_bool",
+      "required" : false,
+      "type" : "boolean"
+    }, {
+      "id" : 2,
+      "name" : "l_partkey_int",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 3,
+      "name" : "l_suppkey_long",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 4,
+      "name" : "l_extendedprice_float",
+      "required" : false,
+      "type" : "float"
+    }, {
+      "id" : 5,
+      "name" : "l_extendedprice_double",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "l_extendedprice_dec9_2",
+      "required" : false,
+      "type" : "decimal(9, 2)"
+    }, {
+      "id" : 7,
+      "name" : "l_extendedprice_dec18_6",
+      "required" : false,
+      "type" : "decimal(18, 6)"
+    }, {
+      "id" : 8,
+      "name" : "l_extendedprice_dec38_10",
+      "required" : false,
+      "type" : "decimal(38, 10)"
+    }, {
+      "id" : 9,
+      "name" : "l_shipdate_date",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 10,
+      "name" : "l_partkey_time",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 11,
+      "name" : "l_commitdate_timestamp",
+      "required" : false,
+      "type" : "timestamp"
+    }, {
+      "id" : 12,
+      "name" : "l_commitdate_timestamp_tz",
+      "required" : false,
+      "type" : "timestamptz"
+    }, {
+      "id" : 13,
+      "name" : "l_comment_string",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 14,
+      "name" : "uuid",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 15,
+      "name" : "l_comment_blob",
+      "required" : false,
+      "type" : "binary"
+    } ]
+  }, {
+    "type" : "struct",
+    "schema-id" : 1,
+    "fields" : [ {
+      "id" : 1,
+      "name" : "l_orderkey_bool",
+      "required" : false,
+      "type" : "boolean"
+    }, {
+      "id" : 2,
+      "name" : "l_partkey_int",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 3,
+      "name" : "l_suppkey_long",
+      "required" : false,
+      "type" : "long"
+    }, {
+      "id" : 4,
+      "name" : "l_extendedprice_float",
+      "required" : false,
+      "type" : "float"
+    }, {
+      "id" : 5,
+      "name" : "l_extendedprice_double",
+      "required" : false,
+      "type" : "double"
+    }, {
+      "id" : 6,
+      "name" : "l_extendedprice_dec9_2",
+      "required" : false,
+      "type" : "decimal(9, 2)"
+    }, {
+      "id" : 7,
+      "name" : "l_extendedprice_dec18_6",
+      "required" : false,
+      "type" : "decimal(18, 6)"
+    }, {
+      "id" : 8,
+      "name" : "l_extendedprice_dec38_10",
+      "required" : false,
+      "type" : "decimal(38, 10)"
+    }, {
+      "id" : 9,
+      "name" : "l_shipdate_date",
+      "required" : false,
+      "type" : "date"
+    }, {
+      "id" : 10,
+      "name" : "l_partkey_time",
+      "required" : false,
+      "type" : "int"
+    }, {
+      "id" : 11,
+      "name" : "l_commitdate_timestamp",
+      "required" : false,
+      "type" : "timestamp"
+    }, {
+      "id" : 12,
+      "name" : "l_commitdate_timestamp_tz",
+      "required" : false,
+      "type" : "timestamptz"
+    }, {
+      "id" : 13,
+      "name" : "l_comment_string",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 14,
+      "name" : "uuid",
+      "required" : false,
+      "type" : "string"
+    }, {
+      "id" : 15,
+      "name" : "l_comment_blob",
+      "required" : false,
+      "type" : "binary"
+    }, {
+      "id" : 16,
+      "name" : "schema_evol_added_col_1",
+      "required" : false,
+      "type" : "int"
+    } ]
+  } ],
+  "partition-spec" : [ ],
+  "default-spec-id" : 0,
+  "partition-specs" : [ {
+    "spec-id" : 0,
+    "fields" : [ ]
+  } ],
+  "last-partition-id" : 999,
+  "default-sort-order-id" : 0,
+  "sort-orders" : [ {
+    "order-id" : 0,
+    "fields" : [ ]
+  } ],
+  "properties" : {
+    "owner" : "peter",
+    "write.parquet.compression-codec" : "zstd"
+  },
+  "current-snapshot-id" : 4407328776463037310,
+  "refs" : {
+    "main" : {
+      "snapshot-id" : 4407328776463037310,
+      "type" : "branch"
+    }
+  },
+  "snapshots" : [ {
+    "snapshot-id" : 9145725745960929259,
+    "timestamp-ms" : 1719580919873,
+    "summary" : {
+      "operation" : "append",
+      "spark.app.id" : "local-1719580917302",
+      "added-data-files" : "1",
+      "added-records" : "6005",
+      "added-files-size" : "440845",
+      "changed-partition-count" : "1",
+      "total-records" : "6005",
+      "total-files-size" : "440845",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/snap-9145725745960929259-1-7723fb1b-ae48-49de-9e77-cd7945667cb9.avro",
+    "schema-id" : 0
+  }, {
+    "snapshot-id" : 8671490307245765264,
+    "parent-snapshot-id" : 9145725745960929259,
+    "timestamp-ms" : 1719580920785,
+    "summary" : {
+      "operation" : "overwrite",
+      "spark.app.id" : "local-1719580917302",
+      "added-data-files" : "1",
+      "deleted-data-files" : "1",
+      "added-records" : "6005",
+      "deleted-records" : "6005",
+      "added-files-size" : "340114",
+      "removed-files-size" : "440845",
+      "changed-partition-count" : "1",
+      "total-records" : "6005",
+      "total-files-size" : "340114",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/snap-8671490307245765264-1-4aa40041-ccc6-4e64-a9ab-366875aafd63.avro",
+    "schema-id" : 0
+  }, {
+    "snapshot-id" : 4543110679664799316,
+    "parent-snapshot-id" : 8671490307245765264,
+    "timestamp-ms" : 1719580921348,
+    "summary" : {
+      "operation" : "append",
+      "spark.app.id" : "local-1719580917302",
+      "added-data-files" : "1",
+      "added-records" : "1685",
+      "added-files-size" : "133331",
+      "changed-partition-count" : "1",
+      "total-records" : "7690",
+      "total-files-size" : "473445",
+      "total-data-files" : "2",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/snap-4543110679664799316-1-e3febcc2-7f11-44b9-80af-571fb1c0463a.avro",
+    "schema-id" : 0
+  }, {
+    "snapshot-id" : 6238750566879819059,
+    "parent-snapshot-id" : 4543110679664799316,
+    "timestamp-ms" : 1719580921764,
+    "summary" : {
+      "operation" : "overwrite",
+      "spark.app.id" : "local-1719580917302",
+      "added-data-files" : "1",
+      "deleted-data-files" : "2",
+      "added-records" : "7690",
+      "deleted-records" : "7690",
+      "added-files-size" : "399010",
+      "removed-files-size" : "473445",
+      "changed-partition-count" : "1",
+      "total-records" : "7690",
+      "total-files-size" : "399010",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/snap-6238750566879819059-1-d76c5203-4f0a-46ef-a293-268e0afec64b.avro",
+    "schema-id" : 0
+  }, {
+    "snapshot-id" : 2276968461870063565,
+    "parent-snapshot-id" : 6238750566879819059,
+    "timestamp-ms" : 1719580922113,
+    "summary" : {
+      "operation" : "overwrite",
+      "spark.app.id" : "local-1719580917302",
+      "changed-partition-count" : "0",
+      "total-records" : "7690",
+      "total-files-size" : "399010",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/snap-2276968461870063565-1-5ee46b42-10e4-401d-8f61-2bd3b5ebb548.avro",
+    "schema-id" : 0
+  }, {
+    "snapshot-id" : 1692767036460164714,
+    "parent-snapshot-id" : 2276968461870063565,
+    "timestamp-ms" : 1719580922559,
+    "summary" : {
+      "operation" : "overwrite",
+      "spark.app.id" : "local-1719580917302",
+      "added-data-files" : "1",
+      "deleted-data-files" : "1",
+      "added-records" : "7690",
+      "deleted-records" : "7690",
+      "added-files-size" : "399010",
+      "removed-files-size" : "399010",
+      "changed-partition-count" : "1",
+      "total-records" : "7690",
+      "total-files-size" : "399010",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/snap-1692767036460164714-1-0f120788-1926-4605-a1ab-450f4cf3ccee.avro",
+    "schema-id" : 0
+  }, {
+    "snapshot-id" : 4407328776463037310,
+    "parent-snapshot-id" : 1692767036460164714,
+    "timestamp-ms" : 1719580923120,
+    "summary" : {
+      "operation" : "overwrite",
+      "spark.app.id" : "local-1719580917302",
+      "added-data-files" : "1",
+      "deleted-data-files" : "1",
+      "added-records" : "7690",
+      "deleted-records" : "7690",
+      "added-files-size" : "400831",
+      "removed-files-size" : "399010",
+      "changed-partition-count" : "1",
+      "total-records" : "7690",
+      "total-files-size" : "400831",
+      "total-data-files" : "1",
+      "total-delete-files" : "0",
+      "total-position-deletes" : "0",
+      "total-equality-deletes" : "0"
+    },
+    "manifest-list" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/snap-4407328776463037310-1-c091e891-ac3a-4429-be9a-e63f1ed63b99.avro",
+    "schema-id" : 1
+  } ],
+  "statistics" : [ ],
+  "snapshot-log" : [ {
+    "timestamp-ms" : 1719580919873,
+    "snapshot-id" : 9145725745960929259
+  }, {
+    "timestamp-ms" : 1719580920785,
+    "snapshot-id" : 8671490307245765264
+  }, {
+    "timestamp-ms" : 1719580921348,
+    "snapshot-id" : 4543110679664799316
+  }, {
+    "timestamp-ms" : 1719580921764,
+    "snapshot-id" : 6238750566879819059
+  }, {
+    "timestamp-ms" : 1719580922113,
+    "snapshot-id" : 2276968461870063565
+  }, {
+    "timestamp-ms" : 1719580922559,
+    "snapshot-id" : 1692767036460164714
+  }, {
+    "timestamp-ms" : 1719580923120,
+    "snapshot-id" : 4407328776463037310
+  } ],
+  "metadata-log" : [ {
+    "timestamp-ms" : 1719580919873,
+    "metadata-file" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/v1.metadata.json"
+  }, {
+    "timestamp-ms" : 1719580920785,
+    "metadata-file" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/v2.metadata.json"
+  }, {
+    "timestamp-ms" : 1719580921348,
+    "metadata-file" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/v3.metadata.json"
+  }, {
+    "timestamp-ms" : 1719580921764,
+    "metadata-file" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/v4.metadata.json"
+  }, {
+    "timestamp-ms" : 1719580922113,
+    "metadata-file" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/v5.metadata.json"
+  }, {
+    "timestamp-ms" : 1719580922559,
+    "metadata-file" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/v6.metadata.json"
+  }, {
+    "timestamp-ms" : 1719580922734,
+    "metadata-file" : "data/iceberg/generated_spec1_0_001/pyspark_iceberg_table/metadata/v7.metadata.json"
+  } ]
+}
