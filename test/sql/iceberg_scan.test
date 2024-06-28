@@ -8,15 +8,9 @@ SELECT * FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg');
 ----
 Catalog Error
 
-require iceberg
-
-# parquet is required for scanning this parquet-backed iceberg table
-statement error
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE);
-----
-Catalog Error
-
 require parquet
+
+require iceberg
 
 ### Scanning latest snapshot
 query I

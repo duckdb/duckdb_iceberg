@@ -6,8 +6,6 @@ require parquet
 
 require iceberg
 
-require-env DUCKDB_ICEBERG_HAVE_TEST_DATA
-
 ### Iceberg spec v1
 
 # Check count matches
@@ -26,7 +24,7 @@ DESCRIBE SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_i
 ----
 
 query I nosort q1-schema
-DESCRIBE SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec1_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
+DESCRIBE SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec1_0_01/expected_results/last/data/*.parquet') ORDER BY uuid;
 ----
 
 # Check data is identical, sorting by uuid to guarantee unique order
@@ -39,7 +37,7 @@ SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec1_0_01/pyspark_iceberg_ta
 ----
 
 query I nosort q1-data
-SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec1_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
+SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec1_0_01/expected_results/last/data/*.parquet') ORDER BY uuid;
 ----
 
 # Confirm the type matches that of the iceberg schema
@@ -72,7 +70,7 @@ DESCRIBE SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_i
 ----
 
 query I nosort q2-schema
-DESCRIBE SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec2_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
+DESCRIBE SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec2_0_01/expected_results/last/data/*.parquet') ORDER BY uuid;
 ----
 
 # Check data is identical, sorting by uuid to guarantee unique order
@@ -86,7 +84,7 @@ SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_01/pyspark_iceberg_ta
 ----
 
 query I nosort q2-data
-SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec2_0_01/expected_results/q08/data/*.parquet') ORDER BY uuid;
+SELECT * FROM PARQUET_SCAN('data/iceberg/generated_spec2_0_01/expected_results/last/data/*.parquet') ORDER BY uuid;
 ----
 
 ### Test schema evolution

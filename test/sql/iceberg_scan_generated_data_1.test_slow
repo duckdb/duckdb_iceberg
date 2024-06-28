@@ -20,7 +20,7 @@ SELECT COUNT(*) FROM ICEBERG_SCAN('data/iceberg/generated_1/pyspark_iceberg_tabl
 ----
 
 query I nosort q1
-SELECT COUNT(*) FROM PARQUET_SCAN('data/iceberg/generated_1/expected_results/q08/data/*.parquet');
+SELECT COUNT(*) FROM PARQUET_SCAN('data/iceberg/generated_1/expected_results/last/data/*.parquet');
 ----
 
 query I nosort q2
@@ -37,5 +37,5 @@ SELECT * FROM ICEBERG_SCAN('data/iceberg/generated_1/pyspark_iceberg_table') WHE
 ----
 
 query I nosort q3
-SELECT * FROM PARQUET_SCAN('data/iceberg/generated_1/expected_results/q08/data/*.parquet')  WHERE uuid NOT NULL ORDER BY uuid;
+SELECT * FROM PARQUET_SCAN('data/iceberg/generated_1/expected_results/last/data/*.parquet')  WHERE uuid NOT NULL ORDER BY uuid;
 ----
