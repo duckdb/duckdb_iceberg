@@ -9,8 +9,8 @@ include extension-ci-tools/makefiles/duckdb_extension.Makefile
 
 # Custom makefile targets
 data: data_clean
-	python3 scripts/test_data_generator/generate_iceberg.py 0.01 data/iceberg/generated_spec1_0_01 1
-	python3 scripts/test_data_generator/generate_iceberg.py 0.01 data/iceberg/generated_spec2_0_01 2
+	python3 scripts/test_data_generator/generate_iceberg.py 0.001 data/iceberg/generated_spec1_0_001 1
+	python3 scripts/test_data_generator/generate_iceberg.py 0.001 data/iceberg/generated_spec2_0_001 2
 
 data_large: data data_clean
 	python3 scripts/test_data_generator/generate_iceberg.py 1 data/iceberg/generated_spec2_1 2
