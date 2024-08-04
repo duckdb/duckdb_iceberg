@@ -167,13 +167,17 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, File
 	return ParseSnapShot(snapshot, info->iceberg_version, info->schema_id, info->schemas, metadata_compression_codec, skip_schema_inference);
 }
 
-// Function to generate a metadata file url
-string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, const string &table_version, const string &metadata_compression_codec) {
-	if (metadata_compression_codec != "gzip") {
-		return fs.JoinPath(meta_path, "v" + table_version + ".metadata.json");
+// Function to generate a metadata file url from version and format string
+// default format is "v%s%s.metadata.json" -> v00###-xxxxxxxxx-.gz.metadata.json"
+string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, const string &table_version, const string &metadata_compression_codec, const string &version_format = DEFAULT_TABLE_VERSION_FORMAT) {
+	// TODO: Need to URL Encode table_version
+	string compression_suffix = "";
+	if (metadata_compression_codec == "gzip") {
+		compression_suffix = ".gz";
 	}
-	return fs.JoinPath(meta_path, "v" + table_version + ".gz.metadata.json");
+	return fs.JoinPath(meta_path, StringUtil::Format(version_format, table_version, compression_suffix));
 }
+
 
 string IcebergSnapshot::ReadMetaData(const string &path, FileSystem &fs, string metadata_compression_codec) {
 	string metadata_file_path;
