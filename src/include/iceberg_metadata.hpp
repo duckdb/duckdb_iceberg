@@ -16,6 +16,9 @@ using namespace duckdb_yyjson;
 
 namespace duckdb {
 
+// First arg is version string, arg is either empty or ".gz" if gzip
+static string DEFAULT_TABLE_VERSION_FORMAT = "v%s%s.metadata.json";
+
 struct IcebergColumnDefinition {
 public:
 	static IcebergColumnDefinition ParseFromJson(yyjson_val *val);
