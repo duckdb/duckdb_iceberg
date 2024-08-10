@@ -16,10 +16,32 @@ SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATH
 lineitem_iceberg/metadata/10eaca8a-1e1c-421e-ad6d-b232e5ee23d3-m1.avro	2	DATA	ADDED	EXISTING	lineitem_iceberg/data/00041-414-f3c73457-bbd6-4b92-9c15-17b241171b16-00001.parquet	PARQUET	51793
 lineitem_iceberg/metadata/10eaca8a-1e1c-421e-ad6d-b232e5ee23d3-m0.avro	2	DATA	DELETED	EXISTING	lineitem_iceberg/data/00000-411-0792dcfe-4e25-4ca3-8ada-175286069a47-00001.parquet	PARQUET	60175
 
+query IIIIIIII
+SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE, version='1');
+----
+lineitem_iceberg/metadata/cf3d0be5-cf70-453d-ad8f-48fdc412e608-m0.avro	1	DATA	ADDED	EXISTING	lineitem_iceberg/data/00000-411-0792dcfe-4e25-4ca3-8ada-175286069a47-00001.parquet	PARQUET	60175
+
+query IIIIIIII
+SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE, version_name_format='v%s%s.metadata.json');
+----
+lineitem_iceberg/metadata/10eaca8a-1e1c-421e-ad6d-b232e5ee23d3-m1.avro	2	DATA	ADDED	EXISTING	lineitem_iceberg/data/00041-414-f3c73457-bbd6-4b92-9c15-17b241171b16-00001.parquet	PARQUET	51793
+lineitem_iceberg/metadata/10eaca8a-1e1c-421e-ad6d-b232e5ee23d3-m0.avro	2	DATA	DELETED	EXISTING	lineitem_iceberg/data/00000-411-0792dcfe-4e25-4ca3-8ada-175286069a47-00001.parquet	PARQUET	60175
+
+query IIIIIIII
+SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE, version='2', version_name_format='v%s%s.metadata.json');
+----
+lineitem_iceberg/metadata/10eaca8a-1e1c-421e-ad6d-b232e5ee23d3-m1.avro	2	DATA	ADDED	EXISTING	lineitem_iceberg/data/00041-414-f3c73457-bbd6-4b92-9c15-17b241171b16-00001.parquet	PARQUET	51793
+lineitem_iceberg/metadata/10eaca8a-1e1c-421e-ad6d-b232e5ee23d3-m0.avro	2	DATA	DELETED	EXISTING	lineitem_iceberg/data/00000-411-0792dcfe-4e25-4ca3-8ada-175286069a47-00001.parquet	PARQUET	60175
+
 statement error
 SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVED_PATHS=TRUE);
 ----
-IO Error: Cannot open file
+IO Error: Iceberg metadata file not found for table version '2' using 'none' compression and format(s): 'v%s%s.metadata.json,%s%s.metadata.json'
+
+statement error
+SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVED_PATHS=TRUE, METADATA_COMPRESSION_CODEC="blarg", version_name_format='blat%s%s');
+----
+IO Error: Iceberg metadata file not found for table version '2' using 'blarg' compression and format(s): 'blat%s%s'
 
 query IIIIIIII
 SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVED_PATHS=TRUE, METADATA_COMPRESSION_CODEC="gzip");
