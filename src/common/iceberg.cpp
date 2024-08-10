@@ -176,20 +176,15 @@ string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, string &tabl
 	if (metadata_compression_codec == "gzip") {
 		compression_suffix = ".gz";
 	}
-	string attempts = "";
 	for(auto try_format : StringUtil::Split(version_format, ',')) {
 		url = fs.JoinPath(meta_path, StringUtil::Format(try_format, table_version, compression_suffix));
 		if(fs.FileExists(url)) {
 			return url;
-		} else {
-			attempts = attempts + ", " + url;
 		}
 	}
 
 	throw IOException(
-		"Iceberg metadata file could not be found for version '%s' using %s and format(s) '%s'. Attempted: %s",
-		table_version, metadata_compression_codec, version_format, attempts
-	);
+		"Iceberg metadata file not found for table version '%s' using '%s' compression and format(s): '%s'", table_version, metadata_compression_codec, version_format);
 }
 
 
