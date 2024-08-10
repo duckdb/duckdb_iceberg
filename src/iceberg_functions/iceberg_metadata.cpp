@@ -151,8 +151,8 @@ TableFunctionSet IcebergFunctions::GetIcebergMetadataFunction() {
 
 	auto fun = TableFunction({LogicalType::VARCHAR}, IcebergMetaDataFunction, IcebergMetaDataBind,
 	                         IcebergMetaDataGlobalTableFunctionState::Init);
-	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
+	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	fun.named_parameters["version"] = LogicalType::VARCHAR;
 	fun.named_parameters["version_name_format"] = LogicalType::VARCHAR;
@@ -160,8 +160,8 @@ TableFunctionSet IcebergFunctions::GetIcebergMetadataFunction() {
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::UBIGINT}, IcebergMetaDataFunction, IcebergMetaDataBind,
 	                    IcebergMetaDataGlobalTableFunctionState::Init);
-	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
+	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	fun.named_parameters["version"] = LogicalType::VARCHAR;
 	fun.named_parameters["version_name_format"] = LogicalType::VARCHAR;
@@ -169,8 +169,8 @@ TableFunctionSet IcebergFunctions::GetIcebergMetadataFunction() {
 
 	fun = TableFunction({LogicalType::VARCHAR, LogicalType::TIMESTAMP}, IcebergMetaDataFunction, IcebergMetaDataBind,
 	                    IcebergMetaDataGlobalTableFunctionState::Init);
-	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["allow_moved_paths"] = LogicalType::BOOLEAN;
+	fun.named_parameters["skip_schema_inference"] = LogicalType::BOOLEAN;
 	fun.named_parameters["metadata_compression_codec"] = LogicalType::VARCHAR;
 	fun.named_parameters["version"] = LogicalType::VARCHAR;
 	fun.named_parameters["version_name_format"] = LogicalType::VARCHAR;

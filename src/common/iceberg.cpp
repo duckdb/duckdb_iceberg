@@ -176,16 +176,19 @@ string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, string &tabl
 	if (metadata_compression_codec == "gzip") {
 		compression_suffix = ".gz";
 	}
+	string attempts = "";
 	for(auto try_format : StringUtil::Split(version_format, ',')) {
 		url = fs.JoinPath(meta_path, StringUtil::Format(try_format, table_version, compression_suffix));
 		if(fs.FileExists(url)) {
 			return url;
+		} else {
+			attempts = attempts + ", " + url;
 		}
 	}
 
 	throw IOException(
-		"Iceberg metadata file could not be found for version '%s' using format(s) '%s'",
-		table_version, version_format
+		"Iceberg metadata file could not be found for version '%s' using %s and format(s) '%s'. Attempted: %s",
+		table_version, metadata_compression_codec, version_format, attempts
 	);
 }
 
@@ -198,7 +201,7 @@ string IcebergSnapshot::GetMetaDataPath(const string &path, FileSystem &fs, stri
 	auto meta_path = fs.JoinPath(path, "metadata");
 	string version_hint;
 		if(StringUtil::EndsWith(table_version, ".text")||StringUtil::EndsWith(table_version, ".txt")) {
-		version_hint = GetTableVersion(path, fs, table_version);
+		version_hint = GetTableVersion(meta_path, fs, table_version);
 	} else {
 		version_hint = table_version;
 	}
@@ -240,8 +243,7 @@ IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t icebe
 	return ret;
 }
 
-string IcebergSnapshot::GetTableVersion(const string &path, FileSystem &fs, string version_file = DEFAULT_VERSION_HINT_FILE) {
-	auto meta_path = fs.JoinPath(path, "metadata");
+string IcebergSnapshot::GetTableVersion(const string &meta_path, FileSystem &fs, string version_file = DEFAULT_VERSION_HINT_FILE) {
 	auto version_file_path = fs.JoinPath(meta_path, version_file);
 	auto version_file_content = IcebergUtils::FileToString(version_file_path, fs);
 

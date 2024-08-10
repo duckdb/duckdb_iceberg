@@ -55,20 +55,20 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	auto bind_data = make_uniq<IcebergSnaphotsBindData>();
 	
 	string metadata_compression_codec = "none";
-	bool skip_schema_inference = false;
 	string table_version = DEFAULT_VERSION_HINT_FILE;
 	string version_name_format = DEFAULT_TABLE_VERSION_FORMAT;
+	bool skip_schema_inference = false;
 	
 	for (auto &kv : input.named_parameters) {
 		auto loption = StringUtil::Lower(kv.first);
 		if (loption == "metadata_compression_codec") {
 			metadata_compression_codec = StringValue::Get(kv.second);
-		} else if (loption == "skip_schema_inference") {
-			skip_schema_inference = BooleanValue::Get(kv.second);
 		} else if (loption == "version") {
 			table_version = StringValue::Get(kv.second);
 		} else if (loption == "version_name_format") {
 			version_name_format = StringValue::Get(kv.second);
+		} else if (loption == "skip_schema_inference") {
+			skip_schema_inference = BooleanValue::Get(kv.second);
 		}
 	}
 	bind_data->filename = input.inputs[0].ToString();
