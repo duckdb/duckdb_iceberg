@@ -172,10 +172,21 @@ IcebergSnapshot IcebergSnapshot::GetSnapshotByTimestamp(const string &path, File
 string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, string &table_version, string &metadata_compression_codec, string &version_format = DEFAULT_TABLE_VERSION_FORMAT) {
 	// TODO: Need to URL Encode table_version
 	string compression_suffix = "";
+	string url;
 	if (metadata_compression_codec == "gzip") {
 		compression_suffix = ".gz";
 	}
-	return fs.JoinPath(meta_path, StringUtil::Format(version_format, table_version, compression_suffix));
+	for(auto try_format : StringUtil::Split(version_format, ',')) {
+		url = fs.JoinPath(meta_path, StringUtil::Format(try_format, table_version, compression_suffix));
+		if(fs.FileExists(url)) {
+			return url;
+		}
+	}
+
+	throw IOException(
+		"Iceberg metadata file could not be found for version '%s' using format(s) '%s'",
+		table_version, version_format
+	);
 }
 
 
@@ -186,8 +197,8 @@ string IcebergSnapshot::GetMetaDataPath(const string &path, FileSystem &fs, stri
 
 	auto meta_path = fs.JoinPath(path, "metadata");
 	string version_hint;
-		if(StringUtil::EndsWith(table_version, ".txt")) {
-		version_hint = GetTableVersion(path, fs, version_format);
+		if(StringUtil::EndsWith(table_version, ".text")||StringUtil::EndsWith(table_version, ".txt")) {
+		version_hint = GetTableVersion(path, fs, table_version);
 	} else {
 		version_hint = table_version;
 	}

@@ -17,7 +17,8 @@ using namespace duckdb_yyjson;
 namespace duckdb {
 
 // First arg is version string, arg is either empty or ".gz" if gzip
-static string DEFAULT_TABLE_VERSION_FORMAT = "v%s%s.metadata.json";
+// Allows for both "v###.gz.metadata.json" and "###.metadata.json" styles
+static string DEFAULT_TABLE_VERSION_FORMAT = "v%s%s.metadata.json,%s%s.metadata.json";
 
 static string DEFAULT_VERSION_HINT_FILE = "version-hint.text";
 
