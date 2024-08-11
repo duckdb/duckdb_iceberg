@@ -30,6 +30,12 @@ SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', 7635660646343
 ----
 51793
 
+# Scanning 2nd snapshot
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', version='2', ALLOW_MOVED_PATHS=TRUE);
+----
+51793
+
 # Scanning latest snapshot at specific moment in time
 # note in the data we have:
 #   1 = 2023-02-15 15:07:54.504
