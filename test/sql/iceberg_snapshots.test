@@ -18,6 +18,26 @@ SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg');
 1	3776207205136740581	2023-02-15 15:07:54.504	lineitem_iceberg/metadata/snap-3776207205136740581-1-cf3d0be5-cf70-453d-ad8f-48fdc412e608.avro
 2	7635660646343998149	2023-02-15 15:08:14.73	lineitem_iceberg/metadata/snap-7635660646343998149-1-10eaca8a-1e1c-421e-ad6d-b232e5ee23d3.avro
 
+query IIII
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg', version='1');
+----
+1	3776207205136740581	2023-02-15 15:07:54.504	lineitem_iceberg/metadata/snap-3776207205136740581-1-cf3d0be5-cf70-453d-ad8f-48fdc412e608.avro
+
+statement error
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg', version="1", version_name_format='v%s%s.metadata.gz');
+----
+IO Error: Iceberg metadata file not found for table version '1' using 'none' compression and format(s): 'v%s%s.metadata.gz'
+
+query IIII
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg', version="1", version_name_format='v%s%s.metadata.json');
+----
+1	3776207205136740581	2023-02-15 15:07:54.504	lineitem_iceberg/metadata/snap-3776207205136740581-1-cf3d0be5-cf70-453d-ad8f-48fdc412e608.avro
+
+query IIII
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg', version='1');
+----
+1	3776207205136740581	2023-02-15 15:07:54.504	lineitem_iceberg/metadata/snap-3776207205136740581-1-cf3d0be5-cf70-453d-ad8f-48fdc412e608.avro
+
 statement error
 SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_nonexistent');
 ----
@@ -26,9 +46,14 @@ IO Error: Cannot open file "data/iceberg/lineitem_iceberg_nonexistent/metadata/v
 statement error
 SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_gz');
 ----
-IO Error: Cannot open file
+IO Error: Iceberg metadata file not found for table version '2' using 'none' compression and format(s): 'v%s%s.metadata.json,%s%s.metadata.json'
 
 query IIII
-SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_gz', METADATA_COMPRESSION_CODEC="gzip");
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_gz', metadata_compression_codec="gzip");
+----
+0	4468019210336628573	2024-03-13 18:38:58.602	lineitem_iceberg_gz/metadata/snap-4468019210336628573-1-23f9dbea-1e7f-4694-a82c-dc3c9a94953e.avro
+
+query IIII
+SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_gz', metadata_compression_codec="gzip", version='2');
 ----
 0	4468019210336628573	2024-03-13 18:38:58.602	lineitem_iceberg_gz/metadata/snap-4468019210336628573-1-23f9dbea-1e7f-4694-a82c-dc3c9a94953e.avro

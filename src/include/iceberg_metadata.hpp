@@ -16,6 +16,12 @@ using namespace duckdb_yyjson;
 
 namespace duckdb {
 
+// First arg is version string, arg is either empty or ".gz" if gzip
+// Allows for both "v###.gz.metadata.json" and "###.metadata.json" styles
+static string DEFAULT_TABLE_VERSION_FORMAT = "v%s%s.metadata.json,%s%s.metadata.json";
+
+static string DEFAULT_VERSION_HINT_FILE = "version-hint.text";
+
 struct IcebergColumnDefinition {
 public:
 	static IcebergColumnDefinition ParseFromJson(yyjson_val *val);
@@ -61,19 +67,20 @@ public:
 	vector<IcebergColumnDefinition> schema;
 	string metadata_compression_codec = "none";
 
-	static IcebergSnapshot GetLatestSnapshot(const string &path, FileSystem &fs, string GetSnapshotByTimestamp, bool skip_schema_inference);
-	static IcebergSnapshot GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id, string GetSnapshotByTimestamp, bool skip_schema_inference);
-	static IcebergSnapshot GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp, string GetSnapshotByTimestamp, bool skip_schema_inference);
+	static IcebergSnapshot GetLatestSnapshot(const string &path, FileSystem &fs, string metadata_compression_codec, bool skip_schema_inference);
+	static IcebergSnapshot GetSnapshotById(const string &path, FileSystem &fs, idx_t snapshot_id, string metadata_compression_codec, bool skip_schema_inference);
+	static IcebergSnapshot GetSnapshotByTimestamp(const string &path, FileSystem &fs, timestamp_t timestamp, string metadata_compression_codec, bool skip_schema_inference);
 
 	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
 	                                     vector<yyjson_val *> &schemas, string metadata_compression_codec, bool skip_schema_inference);
-	static string ReadMetaData(const string &path, FileSystem &fs, string GetSnapshotByTimestamp);
+	static string GetMetaDataPath(const string &path, FileSystem &fs, string metadata_compression_codec, string table_version, string version_format);
+	static string ReadMetaData(const string &path, FileSystem &fs, string metadata_compression_codec);
 	static yyjson_val *GetSnapshots(const string &path, FileSystem &fs, string GetSnapshotByTimestamp);
 	static unique_ptr<SnapshotParseInfo> GetParseInfo(yyjson_doc &metadata_json);
 
 protected:
 	//! Internal JSON parsing functions
-	static string GetTableVersion(const string &path, FileSystem &fs);
+	static string GetTableVersion(const string &path, FileSystem &fs, string version_format);
 	static yyjson_val *FindLatestSnapshotInternal(yyjson_val *snapshots);
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);
