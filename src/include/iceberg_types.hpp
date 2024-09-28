@@ -157,45 +157,57 @@ static string MANIFEST_ENTRY_SCHEMA_V1 = "{\n"
 
 //! An entry in a manifest file
 struct IcebergManifestEntry {
-	explicit IcebergManifestEntry(const c::manifest_entry &schema) {
-		status = (IcebergManifestEntryStatusType)schema.status;
-		content = (IcebergManifestEntryContentType)schema.data_file_.content;
-		file_path = schema.data_file_.file_path;
-		file_format = schema.data_file_.file_format;
-		record_count = schema.data_file_.record_count;
-	}
+    explicit IcebergManifestEntry(const c::manifest_entry &schema) {
+        status = (IcebergManifestEntryStatusType)schema.status;
+        content = (IcebergManifestEntryContentType)schema.data_file_.content;
+        file_path = schema.data_file_.file_path;
+        file_format = schema.data_file_.file_format;
+        record_count = schema.data_file_.record_count;
+        
+        // Initialize bounds as empty maps
+        lower_bounds.clear();
+        upper_bounds.clear();
+    }
 
-	explicit IcebergManifestEntry(const c::manifest_entry_v1 &schema) {
-		status = (IcebergManifestEntryStatusType)schema.status;
-		content = IcebergManifestEntryContentType::DATA;
-		file_path = schema.data_file_.file_path;
-		file_format = schema.data_file_.file_format;
-		record_count = schema.data_file_.record_count;
-	}
+    explicit IcebergManifestEntry(const c::manifest_entry_v1 &schema) {
+        status = (IcebergManifestEntryStatusType)schema.status;
+        content = IcebergManifestEntryContentType::DATA;
+        file_path = schema.data_file_.file_path;
+        file_format = schema.data_file_.file_format;
+        record_count = schema.data_file_.record_count;
 
-	IcebergManifestEntryStatusType status;
+        // Initialize bounds as empty maps
+        lower_bounds.clear();
+        upper_bounds.clear();
+    }
 
-	//! ----- Data File Struct ------
-	IcebergManifestEntryContentType content;
-	string file_path;
-	string file_format;
-	int64_t record_count;
+    IcebergManifestEntryStatusType status;
 
-	void Print() {
-		Printer::Print("    -> ManifestEntry = { type: " + IcebergManifestEntryStatusTypeToString(status) +
-		               ", content: " + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path +
-		               ", record_count: " + to_string(record_count) + "}");
-	}
+    //! ----- Data File Struct ------
+    IcebergManifestEntryContentType content;
+    string file_path;
+    string file_format;
+    int64_t record_count;
 
-	static vector<LogicalType> Types() {
-		return {
-		    LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::BIGINT,
-		};
-	}
+    // Add new members for bounds
+    std::unordered_map<string, Value> lower_bounds;
+    std::unordered_map<string, Value> upper_bounds;
 
-	static vector<string> Names() {
-		return {"status", "content", "file_path", "file_format", "record_count"};
-	}
+    void Print() {
+        Printer::Print("    -> ManifestEntry = { type: " + IcebergManifestEntryStatusTypeToString(status) +
+                       ", content: " + IcebergManifestEntryContentTypeToString(content) + ", file: " + file_path +
+                       ", record_count: " + to_string(record_count) + "}");
+    }
+
+    static vector<LogicalType> Types() {
+        return {
+            LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::VARCHAR, LogicalType::BIGINT,
+        };
+    }
+
+    static vector<string> Names() {
+        return {"status", "content", "file_path", "file_format", "record_count"};
+    }
 };
 
 struct IcebergTableEntry {
