@@ -243,12 +243,9 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
                 column_name = colref->GetColumnName();
 
                 // If the predicate is on 'date', map it to 'date_day'
-                if (column_name == "date") {
-                    column_name = "date_day";
-                    // Transform the predicate value accordingly
-                    // For simplicity, assume 'date_day' is equivalent to 'date' truncated to day
-                    // You might need to adjust this based on your actual transformation
-                }
+                // if (column_name == "date") {
+                //     column_name = "date_day";
+                // }
             } else {
                 // Unsupported predicate structure
                 continue;
@@ -264,6 +261,7 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
 
             std::cout << "  Evaluating predicate: " << predicate->ToString() << std::endl;
             std::cout << "    Mapped Column: " << column_name << ", Value: " << constant_value.ToString() << std::endl;
+			std::cout << "  IcebergManifestEntry lower_bounds: " << entry.lower_bounds.size() << " " << entry.upper_bounds.size() << std::endl;
 
             // Check if we have lower and upper bounds for this column
             if (entry.lower_bounds.find(column_name) != entry.lower_bounds.end() &&
@@ -490,6 +488,8 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
     } else {
         snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_meta_path, fs, metadata_compression_codec, skip_schema_inference);
     }
+
+    std::cout << "Iceberg scan: Got Snapshot" << std::endl;
 
     IcebergTable iceberg_table = IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths, metadata_compression_codec);
 
