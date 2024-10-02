@@ -247,7 +247,7 @@ struct IcebergManifestEntry {
             const auto &bounds_array = data_file.lower_bounds.get_array();
             for (const auto &lb : bounds_array) {
                 std::cout << "Lower bound key: " << lb.key << std::endl;
-                lower_bounds[std::to_string(lb.key)] = DeserializeBound(lb.value);
+                lower_bounds[std::to_string(lb.key)] = lb.value;
             }
         } else {
             std::cout << "Lower bounds is null" << std::endl;
@@ -257,7 +257,7 @@ struct IcebergManifestEntry {
         if (data_file.upper_bounds.idx() == static_cast<size_t>(manifest_entry_json_Union__1__::Branch::array)) {
             const auto &bounds_array = data_file.upper_bounds.get_array();
             for (const auto &ub : bounds_array) {
-                upper_bounds[std::to_string(ub.key)] = DeserializeBound(ub.value);
+                upper_bounds[std::to_string(ub.key)] = ub.value;
             }
         } else {
             std::cout << "Upper bounds is null" << std::endl;
@@ -276,14 +276,6 @@ struct IcebergManifestEntry {
         upper_bounds.clear();
     }
 
-    std::string DeserializeBound(const std::vector<uint8_t> &bound_value) {
-        // Treat the byte vector as binary data and return a hexadecimal or Base64 representation
-        std::ostringstream oss;
-        for (auto byte : bound_value) {
-            oss << std::hex << std::setw(2) << std::setfill('0') << (int)byte;
-        }
-        return oss.str();  // Return a hexadecimal string representation of the binary data
-    }
 
 
 
@@ -296,8 +288,8 @@ struct IcebergManifestEntry {
     int64_t record_count;
 
     // Add new members for bounds
-    std::unordered_map<string, Value> lower_bounds;
-    std::unordered_map<string, Value> upper_bounds;
+    std::unordered_map<std::string, std::vector<uint8_t>> lower_bounds;
+    std::unordered_map<std::string, std::vector<uint8_t>> upper_bounds;
 
     void Print() {
         Printer::Print("    -> ManifestEntry = { type: " + IcebergManifestEntryStatusTypeToString(status) +

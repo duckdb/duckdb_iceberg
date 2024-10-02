@@ -230,83 +230,241 @@ static Value GetParquetSchemaParam(vector<IcebergColumnDefinition> &schema) {
     return ret;
 }
 
-// Enhanced EvaluatePredicateAgainstStatistics
-static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry, const vector<unique_ptr<ParsedExpression>> &predicates) {
+// Utility function to convert byte vector to hex string for logging
+static std::string ByteArrayToHexString(const std::vector<uint8_t> &bytes) {
+    std::ostringstream oss;
+    for (auto byte : bytes) {
+        oss << std::hex << std::setw(2) << std::setfill('0') << (int)byte;
+    }
+    return oss.str();
+}
+
+// static std::string LogicalTypeIdToString(LogicalTypeId id) {
+//     switch (id) {
+//         case LogicalTypeId::SQLNULL:
+//             return "SQLNULL";
+//         case LogicalTypeId::BOOLEAN:
+//             return "BOOLEAN";
+//         case LogicalTypeId::TINYINT:
+//             return "TINYINT";
+//         case LogicalTypeId::SMALLINT:
+//             return "SMALLINT";
+//         case LogicalTypeId::INTEGER:
+//             return "INTEGER";
+//         case LogicalTypeId::BIGINT:
+//             return "BIGINT";
+//         case LogicalTypeId::UTINYINT:
+//             return "UTINYINT";
+//         case LogicalTypeId::USMALLINT:
+//             return "USMALLINT";
+//         case LogicalTypeId::UINTEGER:
+//             return "UINTEGER";
+//         case LogicalTypeId::UBIGINT:
+//             return "UBIGINT";
+//         case LogicalTypeId::FLOAT:
+//             return "FLOAT";
+//         case LogicalTypeId::DOUBLE:
+//             return "DOUBLE";
+//         case LogicalTypeId::DATE:
+//             return "DATE";
+//         case LogicalTypeId::TIMESTAMP:
+//             return "TIMESTAMP";
+//         case LogicalTypeId::TIMESTAMP_TZ:
+//             return "TIMESTAMPTZ";
+//         case LogicalTypeId::INTERVAL:
+//             return "INTERVAL";
+//         case LogicalTypeId::VARCHAR:
+//             return "VARCHAR";
+//         // Add more cases as needed for other LogicalTypeIds
+//         default:
+//             return "UNKNOWN_TYPE";
+//     }
+// }
+
+// Updated DeserializeBound function with detailed logging
+static Value DeserializeBound(const std::vector<uint8_t> &bound_value, const LogicalType &type) {
+    // Log the type ID and raw bound value
+    std::cout << "    DeserializeBound called with Type: " 
+              << LogicalTypeIdToString(type.id()) 
+              << ", Raw Bound Value (Hex): " << ByteArrayToHexString(bound_value) << std::endl;
+
+    Value deserialized_value;
+    try {
+        switch (type.id()) {
+            case LogicalTypeId::INTEGER: {
+                if (bound_value.size() < sizeof(int32_t)) {
+                    throw std::runtime_error("Invalid bound size for INTEGER type");
+                }
+                int32_t val;
+                std::memcpy(&val, bound_value.data(), sizeof(int32_t));
+                deserialized_value = Value::INTEGER(val);
+                break;
+            }
+            case LogicalTypeId::BIGINT: {
+                if (bound_value.size() < sizeof(int64_t)) {
+                    throw std::runtime_error("Invalid bound size for BIGINT type");
+                }
+                int64_t val;
+                std::memcpy(&val, bound_value.data(), sizeof(int64_t));
+                deserialized_value = Value::BIGINT(val);
+                break;
+            }
+            case LogicalTypeId::DATE: {
+                if (bound_value.size() < sizeof(int32_t)) { // Dates are typically stored as int32 (days since epoch)
+                    throw std::runtime_error("Invalid bound size for DATE type");
+                }
+                int32_t days_since_epoch;
+                std::memcpy(&days_since_epoch, bound_value.data(), sizeof(int32_t));
+                // Convert to DuckDB date
+                date_t date = Date::EpochDaysToDate(days_since_epoch);
+                deserialized_value = Value::DATE(date);
+                break;
+            }
+            case LogicalTypeId::TIMESTAMP: {
+                if (bound_value.size() < sizeof(int64_t)) { // Timestamps are typically stored as int64 (microseconds since epoch)
+                    throw std::runtime_error("Invalid bound size for TIMESTAMP type");
+                }
+                int64_t micros_since_epoch;
+                std::memcpy(&micros_since_epoch, bound_value.data(), sizeof(int64_t));
+                std::cout << "    TIMESTAMP bound value (microseconds since epoch): " << micros_since_epoch << std::endl;
+                // Convert to DuckDB timestamp using microseconds
+                timestamp_t timestamp = Timestamp::FromEpochMicroSeconds(micros_since_epoch);
+                deserialized_value = Value::TIMESTAMP(timestamp);
+                std::cout << "    TIMESTAMP bound value (converted): " << deserialized_value.ToString() << std::endl;
+                break;
+            }
+            case LogicalTypeId::DOUBLE: {
+                if (bound_value.size() < sizeof(double)) {
+                    throw std::runtime_error("Invalid bound size for DOUBLE type");
+                }
+                double val;
+                std::memcpy(&val, bound_value.data(), sizeof(double));
+                deserialized_value = Value::DOUBLE(val);
+                break;
+            }
+            case LogicalTypeId::VARCHAR: {
+                // Assume the bytes represent a UTF-8 string
+                std::string str(bound_value.begin(), bound_value.end());
+                deserialized_value = Value(str);
+                break;
+            }
+            // Add more types as needed
+            default:
+                throw std::runtime_error("Unsupported type for DeserializeBound");
+        }
+
+        // Log the final deserialized value
+        std::cout << "    Deserialized Value: " << deserialized_value.ToString() << std::endl;
+    } catch (const std::exception &e) {
+        std::cout << "    Error during deserialization: " << e.what() << std::endl;
+        // Depending on your error handling strategy, you might want to rethrow or handle it here
+        throw;
+    }
+
+    return deserialized_value;
+}
+
+
+static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry, 
+                                               const vector<unique_ptr<ParsedExpression>> &predicates,
+                                               const std::vector<IcebergColumnDefinition> &schema) {
+    // Create a mapping from column names to field IDs and their LogicalTypes
+    std::unordered_map<std::string, std::pair<int, LogicalType>> column_to_field_info;
+    for (const auto &col_def : schema) {
+        column_to_field_info[col_def.name] = {col_def.id, col_def.type}; // Assuming col_def.type is LogicalType
+    }
+
     for (const auto &predicate : predicates) {
         if (auto comparison = dynamic_cast<ComparisonExpression *>(predicate.get())) {
             // Assume predicates are on columns, possibly transformed
-            // Map 'date' to 'date_day' if necessary
-            string column_name;
-            unique_ptr<ParsedExpression> transformed_predicate;
-
+            std::string column_name;
             if (auto colref = dynamic_cast<ColumnRefExpression *>(comparison->left.get())) {
                 column_name = colref->GetColumnName();
-
-                // If the predicate is on 'date', map it to 'date_day'
-                // if (column_name == "date") {
-                //     column_name = "date_day";
-                // }
             } else {
-                // Unsupported predicate structure
+                // Unsupported predicate structure  
+                std::cout << "    Unsupported predicate structure. Skipping predicate." << std::endl;
                 continue;
             }
 
+            // Retrieve field ID and type
+            auto it = column_to_field_info.find(column_name);
+            if (it == column_to_field_info.end()) {
+                // Column not found in schema, cannot evaluate predicate
+                std::cout << "    Column '" << column_name << "' not found in schema. Skipping predicate." << std::endl;
+                continue;
+            }
+            int field_id = it->second.first;
+            LogicalType field_type = it->second.second;
+
+            // Convert field_id to string for lookup
+            std::string field_id_str = std::to_string(field_id);
+
+            // Get lower and upper bounds
+            auto lower_it = entry.lower_bounds.find(field_id_str);
+            auto upper_it = entry.upper_bounds.find(field_id_str);
+
+            if (lower_it == entry.lower_bounds.end() || upper_it == entry.upper_bounds.end()) {
+                std::cout << "    No bounds found for field ID: " << field_id_str << ". Cannot evaluate predicate." << std::endl;
+                continue; // Cannot filter based on missing bounds
+            }
+
+            // Deserialize bounds
+            Value lower_bound, upper_bound;
+            try {
+                lower_bound = DeserializeBound(lower_it->second, field_type);
+                upper_bound = DeserializeBound(upper_it->second, field_type);
+            } catch (const std::exception &e) {
+                std::cout << "    Failed to deserialize bounds for field ID " << field_id_str << ": " << e.what() << std::endl;
+                continue;
+            }
+
+            // Extract the constant value from the predicate
             Value constant_value;
             if (auto const_expr = dynamic_cast<ConstantExpression *>(comparison->right.get())) {
                 constant_value = const_expr->value;
             } else {
                 // Unsupported predicate structure
+                std::cout << "    Unsupported predicate structure on right operand. Skipping predicate." << std::endl;
                 continue;
             }
 
             std::cout << "  Evaluating predicate: " << predicate->ToString() << std::endl;
-            std::cout << "    Mapped Column: " << column_name << ", Value: " << constant_value.ToString() << std::endl;
-			std::cout << "  IcebergManifestEntry lower_bounds: " << entry.lower_bounds.size() << " " << entry.upper_bounds.size() << std::endl;
+            std::cout << "    Mapped Field ID: " << field_id_str << ", Value: " << constant_value.ToString() << std::endl;
+            std::cout << "  IcebergManifestEntry bounds for field ID '" << field_id_str << "':" << std::endl;
+            std::cout << "    Lower bound: " << lower_bound.ToString() << std::endl;
+            std::cout << "    Upper bound: " << upper_bound.ToString() << std::endl;
 
-            // Check if we have lower and upper bounds for this column
-            if (entry.lower_bounds.find(column_name) != entry.lower_bounds.end() &&
-                entry.upper_bounds.find(column_name) != entry.upper_bounds.end()) {
-                const auto &lower_bound = entry.lower_bounds.at(column_name);
-                const auto &upper_bound = entry.upper_bounds.at(column_name);
+            // Evaluate the predicate against the bounds
+            bool result = true;
+            switch (comparison->type) {
+                case ExpressionType::COMPARE_EQUAL:
+                    result = (constant_value >= lower_bound && constant_value <= upper_bound);
+                    break;
+                case ExpressionType::COMPARE_GREATERTHAN:
+                    result = (constant_value <= upper_bound);
+                    break;
+                case ExpressionType::COMPARE_GREATERTHANOREQUALTO:
+                    result = (constant_value <= upper_bound);
+                    break;
+                case ExpressionType::COMPARE_LESSTHAN:
+                    result = (constant_value >= lower_bound);
+                    break;
+                case ExpressionType::COMPARE_LESSTHANOREQUALTO:
+                    result = (constant_value >= lower_bound);
+                    break;
+                default:
+                    // For other types of comparisons, we can't make a decision based on bounds
+                    result = true; // Conservative approach
+                    break;
+            }
 
-                std::cout << "    Column: " << column_name 
-                          << ", Lower bound: " << lower_bound.ToString()
-                          << ", Upper bound: " << upper_bound.ToString()
-                          << std::endl;
-
-                bool result = true;
-                switch (comparison->type) {
-                    case ExpressionType::COMPARE_EQUAL:
-                        result = (constant_value >= lower_bound && constant_value <= upper_bound);
-                        break;
-                    case ExpressionType::COMPARE_GREATERTHAN:
-                        result = (constant_value < upper_bound);
-                        break;
-                    case ExpressionType::COMPARE_GREATERTHANOREQUALTO:
-                        result = (constant_value <= upper_bound);
-                        break;
-                    case ExpressionType::COMPARE_LESSTHAN:
-                        result = (constant_value > lower_bound);
-                        break;
-                    case ExpressionType::COMPARE_LESSTHANOREQUALTO:
-                        result = (constant_value >= lower_bound);
-                        break;
-                    default:
-                        // For other types of comparisons, we can't make a decision based on bounds
-                        result = true; // Conservative approach
-                        break;
-                }
-                std::cout << "    Predicate evaluation result: " << (result ? "true" : "false") << std::endl;
-                if (!result) {
-                    return false;
-                }
-            } else {
-                std::cout << "    No bounds found for column: " << column_name << std::endl;
-                // Without bounds, we cannot exclude the file
+            std::cout << "    Predicate evaluation result: " << (result ? "true" : "false") << std::endl;
+            if (!result) {
+                return false; // If any predicate fails, exclude the file
             }
         }
     }
-    return true;
+    return true; // All predicates passed
 }
 
 // Build the Parquet Scan expression for the files we need to scan
@@ -342,7 +500,7 @@ static unique_ptr<TableRef> MakeScanExpression(const string &iceberg_path, FileS
     if (iceberg_info && !iceberg_info->constraints.empty()) {
         for (const auto &entry : data_file_entries) {
             std::cout << "Evaluating file: " << entry.file_path << std::endl;
-            if (EvaluatePredicateAgainstStatistics(entry, iceberg_info->constraints)) {
+            if (EvaluatePredicateAgainstStatistics(entry, iceberg_info->constraints, schema)) {
                 auto full_path = allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, entry.file_path, fs) : entry.file_path;
                 filtered_data_file_values.emplace_back(full_path);
                 std::cout << "  Iceberg scan: Data file included after filtering: " << full_path << std::endl;
