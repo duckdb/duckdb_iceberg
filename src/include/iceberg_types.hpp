@@ -246,7 +246,6 @@ struct IcebergManifestEntry {
         if (data_file.lower_bounds.idx() == static_cast<size_t>(manifest_entry_json_Union__0__::Branch::array)) {
             const auto &bounds_array = data_file.lower_bounds.get_array();
             for (const auto &lb : bounds_array) {
-                std::cout << "Lower bound key: " << lb.key << std::endl;
                 lower_bounds[std::to_string(lb.key)] = lb.value;
             }
         } else {

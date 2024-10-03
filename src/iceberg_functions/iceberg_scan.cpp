@@ -239,48 +239,6 @@ static std::string ByteArrayToHexString(const std::vector<uint8_t> &bytes) {
     return oss.str();
 }
 
-// static std::string LogicalTypeIdToString(LogicalTypeId id) {
-//     switch (id) {
-//         case LogicalTypeId::SQLNULL:
-//             return "SQLNULL";
-//         case LogicalTypeId::BOOLEAN:
-//             return "BOOLEAN";
-//         case LogicalTypeId::TINYINT:
-//             return "TINYINT";
-//         case LogicalTypeId::SMALLINT:
-//             return "SMALLINT";
-//         case LogicalTypeId::INTEGER:
-//             return "INTEGER";
-//         case LogicalTypeId::BIGINT:
-//             return "BIGINT";
-//         case LogicalTypeId::UTINYINT:
-//             return "UTINYINT";
-//         case LogicalTypeId::USMALLINT:
-//             return "USMALLINT";
-//         case LogicalTypeId::UINTEGER:
-//             return "UINTEGER";
-//         case LogicalTypeId::UBIGINT:
-//             return "UBIGINT";
-//         case LogicalTypeId::FLOAT:
-//             return "FLOAT";
-//         case LogicalTypeId::DOUBLE:
-//             return "DOUBLE";
-//         case LogicalTypeId::DATE:
-//             return "DATE";
-//         case LogicalTypeId::TIMESTAMP:
-//             return "TIMESTAMP";
-//         case LogicalTypeId::TIMESTAMP_TZ:
-//             return "TIMESTAMPTZ";
-//         case LogicalTypeId::INTERVAL:
-//             return "INTERVAL";
-//         case LogicalTypeId::VARCHAR:
-//             return "VARCHAR";
-//         // Add more cases as needed for other LogicalTypeIds
-//         default:
-//             return "UNKNOWN_TYPE";
-//     }
-// }
-
 // Updated DeserializeBound function with detailed logging
 static Value DeserializeBound(const std::vector<uint8_t> &bound_value, const LogicalType &type) {
     // Log the type ID and raw bound value
@@ -331,6 +289,20 @@ static Value DeserializeBound(const std::vector<uint8_t> &bound_value, const Log
                 timestamp_t timestamp = Timestamp::FromEpochMicroSeconds(micros_since_epoch);
                 deserialized_value = Value::TIMESTAMP(timestamp);
                 std::cout << "    TIMESTAMP bound value (converted): " << deserialized_value.ToString() << std::endl;
+                break;
+            }
+            case LogicalTypeId::TIMESTAMP_TZ: { // Added support for TIMESTAMP WITH TIME ZONE
+                if (bound_value.size() < sizeof(int64_t)) { // Assuming stored as int64 (microseconds since epoch)
+                    throw std::runtime_error("Invalid bound size for TIMESTAMP_TZ type");
+                }
+                int64_t micros_since_epoch;
+                std::memcpy(&micros_since_epoch, bound_value.data(), sizeof(int64_t));
+                std::cout << "    TIMESTAMP_TZ bound value (microseconds since epoch): " << micros_since_epoch << std::endl;
+                // Convert to DuckDB timestamp using microseconds
+                timestamp_t timestamp = Timestamp::FromEpochMicroSeconds(micros_since_epoch);
+                // Create a TIMESTAMPTZ Value
+                deserialized_value = Value::TIMESTAMPTZ(timestamp);
+                std::cout << "    TIMESTAMP_TZ bound value (converted): " << deserialized_value.ToString() << std::endl;
                 break;
             }
             case LogicalTypeId::DOUBLE: {
@@ -521,19 +493,56 @@ static unique_ptr<TableRef> MakeScanExpression(const string &iceberg_path, FileS
     std::cout << "Iceberg scan: Delete files: " << delete_file_values.size() << std::endl;
 
     // No deletes, just return a TableFunctionRef for a parquet scan of the data files
+    // No deletes, just return a TableFunctionRef for a parquet scan of the data files
     if (delete_file_values.empty()) {
-        auto table_function_ref_data = make_uniq<TableFunctionRef>();
-        table_function_ref_data->alias = "iceberg_scan_data";
-        vector<unique_ptr<ParsedExpression>> left_children;
-        left_children.emplace_back(make_uniq<ConstantExpression>(Value::LIST(filtered_data_file_values)));
-        if (!skip_schema_inference) {
+        if (!filtered_data_file_values.empty()) {
+            // Existing parquet_scan code
+            auto table_function_ref_data = make_uniq<TableFunctionRef>();
+            table_function_ref_data->alias = "iceberg_scan_data";
+            vector<unique_ptr<ParsedExpression>> left_children;
+            LogicalType child_type = LogicalType::VARCHAR;
             left_children.emplace_back(
-                    make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("schema"),
-                    make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))));
+                make_uniq<ConstantExpression>(
+                    Value::LIST(child_type, filtered_data_file_values)
+                )
+            );
+            if (!skip_schema_inference) {
+                left_children.emplace_back(
+                    make_uniq<ComparisonExpression>(
+                        ExpressionType::COMPARE_EQUAL, 
+                        make_uniq<ColumnRefExpression>("schema"),
+                        make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))
+                    )
+                );
+            }
+            table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
+            return std::move(table_function_ref_data);
+        } else {
+            // **BEGIN: Handling Empty Filtered Data Files**
+            // Create an empty table with the desired schema by constructing a SelectNode with a WHERE FALSE clause
+            auto select_node = make_uniq<SelectNode>();
+            select_node->where_clause = make_uniq<ConstantExpression>(Value::BOOLEAN(false));
+
+            // Add select expressions for each column based on the schema
+            for (const auto &col : schema) {
+                select_node->select_list.emplace_back(make_uniq<ColumnRefExpression>(col.name));
+            }
+
+            // Create a SelectStatement
+            auto select_statement = make_uniq<SelectStatement>();
+            select_statement->node = std::move(select_node);
+
+            // Create a SubqueryRef with the SelectStatement
+            auto table_ref_empty = make_uniq<SubqueryRef>(std::move(select_statement), "empty_scan");
+
+            // Log that we are returning an empty table
+            std::cout << "Iceberg scan: No files to scan after filtering. Returning empty table." << std::endl;
+
+            return std::move(table_ref_empty);
+            // **END: Handling Empty Filtered Data Files**
         }
-        table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
-        return std::move(table_function_ref_data);
     }
+
 
     // Join
     auto join_node = make_uniq<JoinRef>(JoinRefType::REGULAR);
