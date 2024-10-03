@@ -23,7 +23,7 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 ###
 ### Generate dataset
 ###
-os.system(f"python {SCRIPT_DIR}/generate_base_parquet.py {SCALE} {CWD}/{DEST_PATH} spark")
+os.system(f"python3 {SCRIPT_DIR}/generate_base_parquet.py {SCALE} {CWD}/{DEST_PATH} spark")
 
 ###
 ### Configure everyone's favorite apache product
