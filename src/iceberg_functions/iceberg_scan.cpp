@@ -519,14 +519,20 @@ static unique_ptr<TableRef> MakeScanExpression(const string &iceberg_path, FileS
             return std::move(table_function_ref_data);
         } else {
             // **BEGIN: Handling Empty Filtered Data Files**
-            // Create an empty table with the desired schema by constructing a SelectNode with a WHERE FALSE clause
             auto select_node = make_uniq<SelectNode>();
             select_node->where_clause = make_uniq<ConstantExpression>(Value::BOOLEAN(false));
 
             // Add select expressions for each column based on the schema
             for (const auto &col : schema) {
-                select_node->select_list.emplace_back(make_uniq<ColumnRefExpression>(col.name));
+                // Create a NULL constant of the appropriate type
+                auto null_expr = make_uniq<ConstantExpression>(Value(col.type));
+                // Alias it to the column name
+                null_expr->alias = col.name;
+                select_node->select_list.emplace_back(std::move(null_expr));
             }
+
+            // **Add the FROM clause as EmptyTableRef**
+            select_node->from_table = make_uniq<EmptyTableRef>();
 
             // Create a SelectStatement
             auto select_statement = make_uniq<SelectStatement>();
