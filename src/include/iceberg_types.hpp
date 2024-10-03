@@ -248,8 +248,6 @@ struct IcebergManifestEntry {
             for (const auto &lb : bounds_array) {
                 lower_bounds[std::to_string(lb.key)] = lb.value;
             }
-        } else {
-            std::cout << "Lower bounds is null" << std::endl;
         }
 
         // Handle upper_bounds
@@ -258,8 +256,6 @@ struct IcebergManifestEntry {
             for (const auto &ub : bounds_array) {
                 upper_bounds[std::to_string(ub.key)] = ub.value;
             }
-        } else {
-            std::cout << "Upper bounds is null" << std::endl;
         }
     }
 

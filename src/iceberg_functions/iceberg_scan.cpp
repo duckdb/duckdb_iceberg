@@ -35,76 +35,6 @@
 
 namespace duckdb {
 
-// Helper function to log indentation
-static void LogIndent(int indent_level) {
-    for (int i = 0; i < indent_level; ++i) {
-        std::cout << "  ";
-    }
-}
-
-// Utility function to convert ExpressionType enum to string using DuckDB's function
-static std::string GetExpressionTypeString(ExpressionType type) {
-    return ExpressionTypeToString(type); // Use DuckDB's existing function
-}
-
-// Recursive function to log details of a ParsedExpression
-static void LogExpressionDetails(const ParsedExpression &expr, int indent_level = 0) {
-    LogIndent(indent_level);
-    std::cout << "Expression Type: " << GetExpressionTypeString(expr.type) << std::endl;
-    
-    switch (expr.type) {
-        case ExpressionType::CONJUNCTION_AND:
-        case ExpressionType::CONJUNCTION_OR: {
-            auto &conj = (ConjunctionExpression &)expr;
-            std::cout << "Conjunction Type: " << GetExpressionTypeString(conj.type) << std::endl;
-            std::cout << "Number of Children: " << conj.children.size() << std::endl;
-            for (const auto &child : conj.children) {
-                LogExpressionDetails(*child, indent_level + 1);
-            }
-            break;
-        }
-        case ExpressionType::COMPARE_EQUAL:
-        case ExpressionType::COMPARE_GREATERTHAN:
-        case ExpressionType::COMPARE_GREATERTHANOREQUALTO:
-        case ExpressionType::COMPARE_LESSTHAN:
-        case ExpressionType::COMPARE_LESSTHANOREQUALTO: {
-            auto &comp = (ComparisonExpression &)expr;
-            std::cout << "Comparison Operator: " << GetExpressionTypeString(comp.type) << std::endl;
-            LogIndent(indent_level);
-            std::cout << "Left Operand:" << std::endl;
-            LogExpressionDetails(*comp.left, indent_level + 1);
-            LogIndent(indent_level);
-            std::cout << "Right Operand:" << std::endl;
-            LogExpressionDetails(*comp.right, indent_level + 1);
-            break;
-        }
-        case ExpressionType::COLUMN_REF: {
-            auto &col_ref = (ColumnRefExpression &)expr;
-            std::cout << "Column Name: " << col_ref.column_names[0] << std::endl;
-            break;
-        }
-        case ExpressionType::VALUE_CONSTANT: { // Corrected
-            auto &const_expr = (ConstantExpression &)expr;
-            std::cout << "Constant Value: " << const_expr.value.ToString() << std::endl;
-            break;
-        }
-        case ExpressionType::FUNCTION: {
-            auto &func_expr = (FunctionExpression &)expr;
-            std::cout << "Function Name: " << func_expr.function_name << std::endl;
-            std::cout << "Number of Arguments: " << func_expr.children.size() << std::endl;
-            for (const auto &child : func_expr.children) {
-                LogExpressionDetails(*child, indent_level + 1);
-            }
-            break;
-        }
-        // Add more cases as needed for other expression types
-        default:
-            LogIndent(indent_level);
-            std::cout << "Unhandled Expression Type: " << GetExpressionTypeString(expr.type) << std::endl;
-            break;
-    }
-}
-
 // === Derived TableFunctionInfo to hold constraints ===
 struct IcebergTableFunctionInfo : public TableFunctionInfo {
     vector<unique_ptr<ParsedExpression>> constraints;
@@ -241,11 +171,6 @@ static std::string ByteArrayToHexString(const std::vector<uint8_t> &bytes) {
 
 // Updated DeserializeBound function with detailed logging
 static Value DeserializeBound(const std::vector<uint8_t> &bound_value, const LogicalType &type) {
-    // Log the type ID and raw bound value
-    std::cout << "    DeserializeBound called with Type: " 
-              << LogicalTypeIdToString(type.id()) 
-              << ", Raw Bound Value (Hex): " << ByteArrayToHexString(bound_value) << std::endl;
-
     Value deserialized_value;
     try {
         switch (type.id()) {
@@ -284,11 +209,9 @@ static Value DeserializeBound(const std::vector<uint8_t> &bound_value, const Log
                 }
                 int64_t micros_since_epoch;
                 std::memcpy(&micros_since_epoch, bound_value.data(), sizeof(int64_t));
-                std::cout << "    TIMESTAMP bound value (microseconds since epoch): " << micros_since_epoch << std::endl;
                 // Convert to DuckDB timestamp using microseconds
                 timestamp_t timestamp = Timestamp::FromEpochMicroSeconds(micros_since_epoch);
                 deserialized_value = Value::TIMESTAMP(timestamp);
-                std::cout << "    TIMESTAMP bound value (converted): " << deserialized_value.ToString() << std::endl;
                 break;
             }
             case LogicalTypeId::TIMESTAMP_TZ: { // Added support for TIMESTAMP WITH TIME ZONE
@@ -297,12 +220,10 @@ static Value DeserializeBound(const std::vector<uint8_t> &bound_value, const Log
                 }
                 int64_t micros_since_epoch;
                 std::memcpy(&micros_since_epoch, bound_value.data(), sizeof(int64_t));
-                std::cout << "    TIMESTAMP_TZ bound value (microseconds since epoch): " << micros_since_epoch << std::endl;
                 // Convert to DuckDB timestamp using microseconds
                 timestamp_t timestamp = Timestamp::FromEpochMicroSeconds(micros_since_epoch);
                 // Create a TIMESTAMPTZ Value
                 deserialized_value = Value::TIMESTAMPTZ(timestamp);
-                std::cout << "    TIMESTAMP_TZ bound value (converted): " << deserialized_value.ToString() << std::endl;
                 break;
             }
             case LogicalTypeId::DOUBLE: {
@@ -324,12 +245,7 @@ static Value DeserializeBound(const std::vector<uint8_t> &bound_value, const Log
             default:
                 throw std::runtime_error("Unsupported type for DeserializeBound");
         }
-
-        // Log the final deserialized value
-        std::cout << "    Deserialized Value: " << deserialized_value.ToString() << std::endl;
     } catch (const std::exception &e) {
-        std::cout << "    Error during deserialization: " << e.what() << std::endl;
-        // Depending on your error handling strategy, you might want to rethrow or handle it here
         throw;
     }
 
@@ -354,7 +270,6 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
                 column_name = colref->GetColumnName();
             } else {
                 // Unsupported predicate structure  
-                std::cout << "    Unsupported predicate structure. Skipping predicate." << std::endl;
                 continue;
             }
 
@@ -362,7 +277,6 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
             auto it = column_to_field_info.find(column_name);
             if (it == column_to_field_info.end()) {
                 // Column not found in schema, cannot evaluate predicate
-                std::cout << "    Column '" << column_name << "' not found in schema. Skipping predicate." << std::endl;
                 continue;
             }
             int field_id = it->second.first;
@@ -376,7 +290,6 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
             auto upper_it = entry.upper_bounds.find(field_id_str);
 
             if (lower_it == entry.lower_bounds.end() || upper_it == entry.upper_bounds.end()) {
-                std::cout << "    No bounds found for field ID: " << field_id_str << ". Cannot evaluate predicate." << std::endl;
                 continue; // Cannot filter based on missing bounds
             }
 
@@ -386,7 +299,6 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
                 lower_bound = DeserializeBound(lower_it->second, field_type);
                 upper_bound = DeserializeBound(upper_it->second, field_type);
             } catch (const std::exception &e) {
-                std::cout << "    Failed to deserialize bounds for field ID " << field_id_str << ": " << e.what() << std::endl;
                 continue;
             }
 
@@ -396,16 +308,8 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
                 constant_value = const_expr->value;
             } else {
                 // Unsupported predicate structure
-                std::cout << "    Unsupported predicate structure on right operand. Skipping predicate." << std::endl;
                 continue;
             }
-
-            std::cout << "  Evaluating predicate: " << predicate->ToString() << std::endl;
-            std::cout << "    Mapped Field ID: " << field_id_str << ", Value: " << constant_value.ToString() << std::endl;
-            std::cout << "  IcebergManifestEntry bounds for field ID '" << field_id_str << "':" << std::endl;
-            std::cout << "    Lower bound: " << lower_bound.ToString() << std::endl;
-            std::cout << "    Upper bound: " << upper_bound.ToString() << std::endl;
-
             // Evaluate the predicate against the bounds
             bool result = true;
             switch (comparison->type) {
@@ -429,8 +333,6 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
                     result = true; // Conservative approach
                     break;
             }
-
-            std::cout << "    Predicate evaluation result: " << (result ? "true" : "false") << std::endl;
             if (!result) {
                 return false; // If any predicate fails, exclude the file
             }
@@ -446,54 +348,22 @@ static unique_ptr<TableRef> MakeScanExpression(const string &iceberg_path, FileS
                                                vector<IcebergColumnDefinition> &schema, bool allow_moved_paths,
                                                string metadata_compression_codec, bool skip_schema_inference,
                                                const IcebergTableFunctionInfo *iceberg_info = nullptr) {
-    // Log the total number of files before filtering
-    std::cout << "Iceberg scan: Total data files before filtering: " << data_file_entries.size() << std::endl;
-
-    if (iceberg_info) {
-        std::cout << "Iceberg scan: iceberg_info provided." << std::endl;
-        std::cout << "Iceberg scan: Number of constraints: " << iceberg_info->constraints.size() << std::endl;
-    } else {
-        std::cout << "Iceberg scan: iceberg_info is nullptr." << std::endl;
-    }
-
-    // Log predicates if they exist
-    if (iceberg_info && !iceberg_info->constraints.empty()) {
-        std::cout << "Iceberg scan: Predicates applied:" << std::endl;
-        int predicate_index = 1;
-        for (const auto &predicate : iceberg_info->constraints) {
-            std::cout << "  Predicate " << predicate_index++ << ":" << std::endl;
-            LogExpressionDetails(*predicate, 2); // Indent level 2 for predicates
-        }
-    } else {
-        std::cout << "Iceberg scan: No predicates applied" << std::endl;
-    }
 
     vector<Value> filtered_data_file_values;
     if (iceberg_info && !iceberg_info->constraints.empty()) {
         for (const auto &entry : data_file_entries) {
-            std::cout << "Evaluating file: " << entry.file_path << std::endl;
             if (EvaluatePredicateAgainstStatistics(entry, iceberg_info->constraints, schema)) {
                 auto full_path = allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, entry.file_path, fs) : entry.file_path;
                 filtered_data_file_values.emplace_back(full_path);
-                std::cout << "  Iceberg scan: Data file included after filtering: " << full_path << std::endl;
-            } else {
-                std::cout << "  Iceberg scan: Data file excluded after filtering: " << entry.file_path << std::endl;
             }
         }
-        std::cout << "Iceberg scan: Data files after filtering: " << filtered_data_file_values.size() << std::endl;
     } else {
         for (const auto &entry : data_file_entries) {
             auto full_path = allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, entry.file_path, fs) : entry.file_path;
             filtered_data_file_values.emplace_back(full_path);
         }
-        std::cout << "Iceberg scan: No predicates applied, all " << filtered_data_file_values.size() << " files included" << std::endl;
     }
 
-    // Log delete files
-    std::cout << "Iceberg scan: Delete files: " << delete_file_values.size() << std::endl;
-
-    // No deletes, just return a TableFunctionRef for a parquet scan of the data files
-    // No deletes, just return a TableFunctionRef for a parquet scan of the data files
     if (delete_file_values.empty()) {
         if (!filtered_data_file_values.empty()) {
             // Existing parquet_scan code
@@ -540,9 +410,6 @@ static unique_ptr<TableRef> MakeScanExpression(const string &iceberg_path, FileS
 
             // Create a SubqueryRef with the SelectStatement
             auto table_ref_empty = make_uniq<SubqueryRef>(std::move(select_statement), "empty_scan");
-
-            // Log that we are returning an empty table
-            std::cout << "Iceberg scan: No files to scan after filtering. Returning empty table." << std::endl;
 
             return std::move(table_ref_empty);
             // **END: Handling Empty Filtered Data Files**
@@ -611,10 +478,6 @@ static unique_ptr<TableRef> MakeScanExpression(const string &iceberg_path, FileS
 static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, TableFunctionBindInput &input) {
     FileSystem &fs = FileSystem::GetFileSystem(context);
     auto iceberg_path = input.inputs[0].ToString();
-
-    // Log the input path
-    std::cout << "Iceberg scan: Input path: " << iceberg_path << std::endl;
-
     // Parse named parameters
     bool allow_moved_paths = false;
     bool skip_schema_inference = false;
@@ -645,9 +508,6 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
     }
     auto iceberg_meta_path = IcebergSnapshot::GetMetaDataPath(iceberg_path, fs, metadata_compression_codec, table_version, version_name_format);
     
-    // Log the metadata path
-    std::cout << "Iceberg scan: Metadata path: " << iceberg_meta_path << std::endl;
-
     IcebergSnapshot snapshot_to_scan;
     if (input.inputs.size() > 1) {
         if (input.inputs[1].type() == LogicalType::UBIGINT) {
@@ -662,61 +522,31 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
         snapshot_to_scan = IcebergSnapshot::GetLatestSnapshot(iceberg_meta_path, fs, metadata_compression_codec, skip_schema_inference);
     }
 
-    std::cout << "Iceberg scan: Got Snapshot" << std::endl;
-
     IcebergTable iceberg_table = IcebergTable::Load(iceberg_path, snapshot_to_scan, fs, allow_moved_paths, metadata_compression_codec);
-
-    // Log some information about the loaded table
-    std::cout << "Iceberg scan: Loaded table with " << iceberg_table.entries.size() << " entries" << std::endl;
 
     auto data_entries = iceberg_table.GetEntries<IcebergManifestContentType::DATA>();
     auto delete_files = iceberg_table.GetPaths<IcebergManifestContentType::DELETE>();
-
-    // Log information about data entries and delete files
-    std::cout << "Iceberg scan: Found " << data_entries.size() << " data entries" << std::endl;
-    std::cout << "Iceberg scan: Found " << delete_files.size() << " delete files" << std::endl;
 
     vector<Value> delete_file_values;
     for (auto &delete_file : delete_files) {
         auto full_path = allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, delete_file, fs) : delete_file;
         delete_file_values.emplace_back(full_path);
-        
-        // Log each delete file path
-        std::cout << "Iceberg scan: Delete file: " << full_path << std::endl;
     }
 
     // === Extract predicates from input.binder ===
 	vector<unique_ptr<ParsedExpression>> extracted_predicates;
 	if (input.binder) {
-    std::cout << "Iceberg scan: input.binder: " << input.binder << std::endl;
-    
-    // Access the where_clause from the binder
-    auto statement = input.binder->GetRootStatement();
-    if (statement && statement->type == StatementType::SELECT_STATEMENT) {
-        auto &select_statement = (SelectStatement &)*statement;
-        if (select_statement.node->type == QueryNodeType::SELECT_NODE) {
-            auto &select_node = (SelectNode &)*select_statement.node;
-            if (select_node.where_clause) {
-				std::cout << "Iceberg scan: select_node.where_clause: " << select_node.where_clause->ToString() << std::endl;
-                ExtractPredicates(*select_node.where_clause, extracted_predicates);
+        // Access the where_clause from the binder
+        auto statement = input.binder->GetRootStatement();
+        if (statement && statement->type == StatementType::SELECT_STATEMENT) {
+            auto &select_statement = (SelectStatement &)*statement;
+            if (select_statement.node->type == QueryNodeType::SELECT_NODE) {
+                auto &select_node = (SelectNode &)*select_statement.node;
+                if (select_node.where_clause) {
+                    ExtractPredicates(*select_node.where_clause, extracted_predicates);
+                }
             }
         }
-    }
-    
-    // Log the number of extracted predicates
-    std::cout << "Iceberg scan: Extracted " << extracted_predicates.size() << " predicates" << std::endl;
-    
-    // Optionally, you can log details of each extracted predicate
-    for (size_t i = 0; i < extracted_predicates.size(); ++i) {
-        std::cout << "Predicate " << i + 1 << ": " << extracted_predicates[i]->ToString() << std::endl;
-        }
-    }
-
-    // Log extracted predicates for debugging
-    std::cout << "Iceberg scan: Extracted Predicates:" << std::endl;
-    int pred_index = 1;
-    for (const auto &pred : extracted_predicates) {
-        std::cout << "  Predicate " << pred_index++ << ": " << pred->ToString() << std::endl;
     }
 
     // Create IcebergTableFunctionInfo with extracted predicates
@@ -795,15 +625,9 @@ static void IcebergPushdownFilter(ClientContext &context, LogicalGet &get, Funct
             throw InternalException("Invalid bind_data in pushdown_complex_filter");
         }
 		combined_filter = std::move(iceberg_data->pushdown_predicate);
-		std::cout << "Iceberg scan: pushdown_complex_filter: 1 filter" << std::endl;
     } else {
         auto conj = make_uniq<ConjunctionExpression>(ExpressionType::CONJUNCTION_AND);
-        for (auto &filter : filters) {
-			std::cout << "Iceberg scan: pushdown_complex_filter: adding filter" << std::endl;
-            // conj->children.emplace_back(std::move(filter));
-        }
         combined_filter = std::move(conj);
-		std::cout << "Iceberg scan: pushdown_complex_filter: added " << filters.size() << " filters" << std::endl;
     }
 
     // Store the combined filter in FunctionData
@@ -813,13 +637,6 @@ static void IcebergPushdownFilter(ClientContext &context, LogicalGet &get, Funct
     }
 
     iceberg_data->pushdown_predicate = std::move(combined_filter);
-
-    // Optionally, log the received predicate
-    if (iceberg_data->pushdown_predicate) {
-        std::cout << "Iceberg scan: Received pushdown predicate: " << iceberg_data->pushdown_predicate->ToString() << std::endl;
-    } else {
-        std::cout << "Iceberg scan: No pushdown predicate received." << std::endl;
-    }
 
     // By returning nullptr, we indicate that the predicate has been handled
     // If you wish DuckDB to handle additional transformations, modify here
