@@ -160,15 +160,6 @@ static Value GetParquetSchemaParam(vector<IcebergColumnDefinition> &schema) {
     return ret;
 }
 
-// Utility function to convert byte vector to hex string for logging
-static std::string ByteArrayToHexString(const std::vector<uint8_t> &bytes) {
-    std::ostringstream oss;
-    for (auto byte : bytes) {
-        oss << std::hex << std::setw(2) << std::setfill('0') << (int)byte;
-    }
-    return oss.str();
-}
-
 // Updated DeserializeBound function with detailed logging
 static Value DeserializeBound(const std::vector<uint8_t> &bound_value, const LogicalType &type) {
     Value deserialized_value;
@@ -262,6 +253,8 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
         column_to_field_info[col_def.name] = {col_def.id, col_def.type}; // Assuming col_def.type is LogicalType
     }
 
+    // Printer::Print("Evaluating predicates against statistics...");
+
     for (const auto &predicate : predicates) {
         if (auto comparison = dynamic_cast<ComparisonExpression *>(predicate.get())) {
             // Assume predicates are on columns, possibly transformed
@@ -270,6 +263,7 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
                 column_name = colref->GetColumnName();
             } else {
                 // Unsupported predicate structure  
+                Printer::Print("Unsupported predicate structure: " + column_name + " " + predicate->ToString());
                 continue;
             }
 
@@ -348,8 +342,16 @@ static unique_ptr<TableRef> MakeScanExpression(const string &iceberg_path, FileS
                                                vector<IcebergColumnDefinition> &schema, bool allow_moved_paths,
                                                string metadata_compression_codec, bool skip_schema_inference,
                                                const IcebergTableFunctionInfo *iceberg_info = nullptr) {
-
     vector<Value> filtered_data_file_values;
+    Printer::Print("Making scan expression...");
+    if (iceberg_info && !iceberg_info->constraints.empty()) {
+        Printer::Print("Constraints:");
+        for (const auto& constraint : iceberg_info->constraints) {
+            Printer::Print("  " + constraint->ToString());
+        }
+    } else {
+        Printer::Print("No constraints applied.");
+    }
     if (iceberg_info && !iceberg_info->constraints.empty()) {
         for (const auto &entry : data_file_entries) {
             if (EvaluatePredicateAgainstStatistics(entry, iceberg_info->constraints, schema)) {
@@ -363,7 +365,8 @@ static unique_ptr<TableRef> MakeScanExpression(const string &iceberg_path, FileS
             filtered_data_file_values.emplace_back(full_path);
         }
     }
-
+    // Print total files and starting files
+    Printer::Print("Total files: " + std::to_string(data_file_entries.size()) + ", Files after filter: " + std::to_string(filtered_data_file_values.size()));
     if (delete_file_values.empty()) {
         if (!filtered_data_file_values.empty()) {
             // Existing parquet_scan code
@@ -532,21 +535,37 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
         auto full_path = allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, delete_file, fs) : delete_file;
         delete_file_values.emplace_back(full_path);
     }
-
     // === Extract predicates from input.binder ===
 	vector<unique_ptr<ParsedExpression>> extracted_predicates;
 	if (input.binder) {
-        // Access the where_clause from the binder
         auto statement = input.binder->GetRootStatement();
-        if (statement && statement->type == StatementType::SELECT_STATEMENT) {
-            auto &select_statement = (SelectStatement &)*statement;
-            if (select_statement.node->type == QueryNodeType::SELECT_NODE) {
-                auto &select_node = (SelectNode &)*select_statement.node;
-                if (select_node.where_clause) {
-                    ExtractPredicates(*select_node.where_clause, extracted_predicates);
+        if (!statement) {
+            // Printer::Print("No root statement found in binder.");
+        } else {
+            // Printer::Print("Extracting predicates from statement type: " + to_string((int)statement->type));
+            if (statement->type == StatementType::SELECT_STATEMENT) {
+                auto &select_statement = (SelectStatement &)*statement;
+                if (select_statement.node->type == QueryNodeType::SELECT_NODE) {
+                    auto &select_node = (SelectNode &)*select_statement.node;
+                    if (select_node.where_clause) {
+                        // Printer::Print("Extracting predicates from WHERE clause: " + select_node.where_clause->ToString());
+                        ExtractPredicates(*select_node.where_clause, extracted_predicates);
+                        // Printer::Print("Extracted " + to_string(extracted_predicates.size()) + " predicates.");
+                        for (auto &pred : extracted_predicates) {
+                            // Printer::Print("Predicate: " + pred->ToString());
+                        }
+                    } else {
+                        // Printer::Print("No WHERE clause found.");
+                    }
+                } else {
+                    // Printer::Print("Statement node is not a SELECT_NODE.");
                 }
+            } else {
+                // Printer::Print("Statement is not a SELECT_STATEMENT.");
             }
         }
+    } else {
+        // Printer::Print("No binder found.");
     }
 
     // Create IcebergTableFunctionInfo with extracted predicates
