@@ -129,18 +129,26 @@ static Value GetParquetSchemaParam(vector<IcebergColumnDefinition> &schema) {
 
 //! Build the Parquet Scan expression for the files we need to scan
 static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, vector<Value> &delete_file_values,
-                                               vector<IcebergColumnDefinition> &schema, bool allow_moved_paths, string metadata_compression_codec, bool skip_schema_inference) {
+                                               vector<IcebergColumnDefinition> &schema, bool allow_moved_paths,
+                                               string metadata_compression_codec, bool skip_schema_inference,
+                                               int64_t data_cardinality, int64_t delete_cardinality) {
+    
+	auto cardinality = make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("explicit_cardinality"),
+	                                                                                  make_uniq<ConstantExpression>(Value(data_cardinality)));
+
 	// No deletes, just return a TableFunctionRef for a parquet scan of the data files
 	if (delete_file_values.empty()) {
 		auto table_function_ref_data = make_uniq<TableFunctionRef>();
 		table_function_ref_data->alias = "iceberg_scan_data";
 		vector<unique_ptr<ParsedExpression>> left_children;
 		left_children.push_back(make_uniq<ConstantExpression>(Value::LIST(data_file_values)));
+		left_children.push_back(move(cardinality));
 		if (!skip_schema_inference) {
 			left_children.push_back(
 					make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("schema"),
 					make_uniq<ConstantExpression>(GetParquetSchemaParam(schema))));
 		}
+
 		table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
 		return std::move(table_function_ref_data);
 	}
@@ -165,6 +173,7 @@ static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, 
 	table_function_ref_data->alias = "iceberg_scan_data";
 	vector<unique_ptr<ParsedExpression>> left_children;
 	left_children.push_back(make_uniq<ConstantExpression>(Value::LIST(data_file_values)));
+	left_children.push_back(move(cardinality));
 	left_children.push_back(make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL,
 	                                                        make_uniq<ColumnRefExpression>("filename"),
 	                                                        make_uniq<ConstantExpression>(Value(1))));
@@ -184,6 +193,8 @@ static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, 
 	table_function_ref_deletes->alias = "iceberg_scan_deletes";
 	vector<unique_ptr<ParsedExpression>> right_children;
 	right_children.push_back(make_uniq<ConstantExpression>(Value::LIST(delete_file_values)));
+	right_children.push_back(make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("explicit_cardinality"),
+	                                                                                        make_uniq<ConstantExpression>(Value(delete_cardinality))));
 	table_function_ref_deletes->function = make_uniq<FunctionExpression>("parquet_scan", std::move(right_children));
 	join_node->right = std::move(table_function_ref_deletes);
 
@@ -269,7 +280,19 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	if (mode == "list_files") {
 		return MakeListFilesExpression(data_file_values, delete_file_values);
 	} else if (mode == "default") {
-		return MakeScanExpression(data_file_values, delete_file_values, snapshot_to_scan.schema, allow_moved_paths, metadata_compression_codec, skip_schema_inference);
+		int64_t data_cardinality = 0, delete_cardinality = 0;
+		for(auto &manifest : iceberg_table.entries) {
+			for(auto &entry : manifest.manifest_entries) {
+				if (entry.status != IcebergManifestEntryStatusType::DELETED) {
+					if (entry.content == IcebergManifestEntryContentType::DATA) {
+						data_cardinality += entry.record_count;
+					} else { // DELETES
+						delete_cardinality += entry.record_count;
+					}
+				}
+			}
+		}
+		return MakeScanExpression(data_file_values, delete_file_values, snapshot_to_scan.schema, allow_moved_paths, metadata_compression_codec, skip_schema_inference, data_cardinality, delete_cardinality);
 	} else {
 		throw NotImplementedException("Unknown mode type for ICEBERG_SCAN bind : '" + mode + "'");
 	}
