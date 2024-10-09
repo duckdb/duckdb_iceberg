@@ -22,12 +22,12 @@ string IcebergUtils::GzFileToString(const string &path, FileSystem &fs) {
 }
 
 string IcebergUtils::GetFullPath(const string &iceberg_path, const string &relative_file_path, FileSystem &fs) {
-	std::size_t found = relative_file_path.find("/metadata/");
+	std::size_t found = relative_file_path.rfind("/metadata/");
 	if (found != string::npos) {
 		return fs.JoinPath(iceberg_path, relative_file_path.substr(found + 1));
 	}
 
-	found = relative_file_path.find("/data/");
+	found = relative_file_path.rfind("/data/");
 	if (found != string::npos) {
 		return fs.JoinPath(iceberg_path, relative_file_path.substr(found + 1));
 	}
