@@ -142,7 +142,7 @@ static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, 
 		table_function_ref_data->alias = "iceberg_scan_data";
 		vector<unique_ptr<ParsedExpression>> left_children;
 		left_children.push_back(make_uniq<ConstantExpression>(Value::LIST(data_file_values)));
-		left_children.push_back(move(cardinality));
+		left_children.push_back(std::move(cardinality));
 		if (!skip_schema_inference) {
 			left_children.push_back(
 					make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL, make_uniq<ColumnRefExpression>("schema"),
@@ -173,7 +173,7 @@ static unique_ptr<TableRef> MakeScanExpression(vector<Value> &data_file_values, 
 	table_function_ref_data->alias = "iceberg_scan_data";
 	vector<unique_ptr<ParsedExpression>> left_children;
 	left_children.push_back(make_uniq<ConstantExpression>(Value::LIST(data_file_values)));
-	left_children.push_back(move(cardinality));
+	left_children.push_back(std::move(cardinality));
 	left_children.push_back(make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL,
 	                                                        make_uniq<ColumnRefExpression>("filename"),
 	                                                        make_uniq<ConstantExpression>(Value(1))));
