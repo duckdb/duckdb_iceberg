@@ -538,6 +538,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
     // === Extract predicates from input.binder ===
 	vector<unique_ptr<ParsedExpression>> extracted_predicates;
 	if (input.binder) {
+        // this is null when using CTEs
         auto statement = input.binder->GetRootStatement();
         if (!statement) {
             // Printer::Print("No root statement found in binder.");
