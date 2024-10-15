@@ -1,4 +1,4 @@
-# name: test/sql/iceberg_scan_generated_data_0_001.test_slow
+# name: test/sql/iceberg_scan_generated_data_0_001.test
 # description: test iceberg extension with the sf0.001 generated test set
 # group: [iceberg]
 
@@ -106,3 +106,9 @@ statement error
 DESCRIBE SELECT schema_evol_added_col_1 FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_001/pyspark_iceberg_table/metadata/v6.metadata.json') ORDER BY uuid;
 ----
 Binder Error
+
+# Check that there are injected cardinality
+query II
+EXPLAIN SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/generated_spec2_0_001/pyspark_iceberg_table');
+----
+physical_plan	<REGEX>:.* ANTI .*PARQUET_SCAN.*Rows.*Rows.*
