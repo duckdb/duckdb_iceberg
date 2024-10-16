@@ -80,8 +80,8 @@ vector<IcebergManifestEntry> IcebergTable::ReadManifestEntries(const string &pat
 		}
 	} else {
 		auto schema = avro::compileJsonSchemaFromString(MANIFEST_ENTRY_SCHEMA);
-		avro::DataFileReader<c::manifest_entry> dfr(std::move(stream), schema);
-		c::manifest_entry manifest_entry;
+		avro::DataFileReader<manifest_entry> dfr(std::move(stream), schema);
+		manifest_entry manifest_entry;
 		while (dfr.read(manifest_entry)) {
 			ret.emplace_back(IcebergManifestEntry(manifest_entry));
 		}
