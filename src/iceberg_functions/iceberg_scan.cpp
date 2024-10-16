@@ -355,18 +355,6 @@ MakeScanExpression(const string &iceberg_path, FileSystem &fs, vector<IcebergMan
                    string metadata_compression_codec, bool skip_schema_inference, const IcebergTable &iceberg_table,
                    int64_t data_cardinality, int64_t delete_cardinality,
                    const IcebergTableFunctionInfo *iceberg_info = nullptr) {
-	// Log the total number of files before filtering
-	fprintf(stderr, "Iceberg scan: Total number of files before filtering: %zu\n", data_file_entries.size());
-
-	// Log predicates if they exist
-	if (iceberg_info && !iceberg_info->constraints.empty()) {
-		int predicate_index = 1;
-		for (const auto &predicate : iceberg_info->constraints) {
-			fprintf(stderr, "  Predicate %d: %s\n", predicate_index++, predicate->ToString().c_str());
-		}
-	} else {
-		fprintf(stderr, "Iceberg scan: No predicates applied\n");
-	}
 
 	// Filter data files based on predicates
 	vector<Value> filtered_data_file_values;
@@ -392,8 +380,6 @@ MakeScanExpression(const string &iceberg_path, FileSystem &fs, vector<IcebergMan
 
 	// Handle the scenario with no delete files
 	if (delete_file_values.empty()) {
-		fprintf(stderr, "Iceberg scan: No delete files\n");
-		fprintf(stderr, "Iceberg scan: filtered_data_file_values: %zu\n", filtered_data_file_values.size());
 		auto table_function_ref_data = make_uniq<TableFunctionRef>();
 		table_function_ref_data->alias = "iceberg_scan_data";
 		vector<unique_ptr<ParsedExpression>> left_children;
@@ -419,32 +405,16 @@ MakeScanExpression(const string &iceberg_path, FileSystem &fs, vector<IcebergMan
 		}
 		table_function_ref_data->function = make_uniq<FunctionExpression>("parquet_scan", std::move(left_children));
 		return std::move(table_function_ref_data);
-	} else {
-		fprintf(stderr, "Iceberg scan: Has delete files\n");
 	}
-
-	// for (auto &manifest : iceberg_table.entries) { // Now valid
-	// 	for (auto &entry : manifest.manifest_entries) {
-	// 		if (entry.status != IcebergManifestEntryStatusType::DELETED) {
-	// 			if (entry.content == IcebergManifestEntryContentType::DATA) {
-	// 				// Already counted in data_cardinality
-	// 			} else { // DELETES
-	// 				delete_cardinality += entry.record_count;
-	// 			}
-	// 		}
-	// 	}
-	// }
 
 	// Join
 	auto join_node = make_uniq<JoinRef>(JoinRefType::REGULAR);
-	fprintf(stderr, "Iceberg scan: join_node: %p\n", join_node.get());
 	auto filename_match_expr =
 	    allow_moved_paths
 	        ? GetFilenameMatchExpr()
 	        : make_uniq<ComparisonExpression>(ExpressionType::COMPARE_NOT_DISTINCT_FROM,
 	                                          make_uniq<ColumnRefExpression>("filename", "iceberg_scan_data"),
 	                                          make_uniq<ColumnRefExpression>("file_path", "iceberg_scan_deletes"));
-	fprintf(stderr, "Iceberg scan: filename_match_expr: %p\n", filename_match_expr.get());
 	join_node->type = JoinType::ANTI;
 	join_node->condition = make_uniq<ConjunctionExpression>(
 	    ExpressionType::CONJUNCTION_AND, std::move(filename_match_expr),
@@ -488,7 +458,6 @@ MakeScanExpression(const string &iceberg_path, FileSystem &fs, vector<IcebergMan
 
 	// Construct Select node
 	auto select_node = make_uniq<SelectNode>();
-	fprintf(stderr, "Iceberg scan: select_node: %p\n", select_node.get());
 	select_node->from_table = std::move(join_node);
 	auto select_expr = make_uniq<StarExpression>();
 	select_expr->exclude_list = {"filename", "file_row_number"};
@@ -496,20 +465,17 @@ MakeScanExpression(const string &iceberg_path, FileSystem &fs, vector<IcebergMan
 	select_exprs.emplace_back(std::move(select_expr));
 	select_node->select_list = std::move(select_exprs);
 	select_statement->node = std::move(select_node);
-	fprintf(stderr, "Iceberg scan: select_statement: %s\n", select_statement->ToString().c_str());
 
 	return make_uniq<SubqueryRef>(std::move(select_statement), "iceberg_scan");
 }
 
 static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, TableFunctionBindInput &input) {
-	fprintf(stderr, "Iceberg scan: context: %p\n", &context);
 	FileSystem &fs = FileSystem::GetFileSystem(context);
 	auto iceberg_path = input.inputs[0].ToString();
 
 	// Enabling this will ensure the ANTI Join with the deletes only looks at filenames, instead of full paths
 	// this allows hive tables to be moved and have mismatching paths, useful for testing, but will have worse
 	// performance
-	fprintf(stderr, "Iceberg scan: iceberg_path: %s\n", iceberg_path.c_str());
 	bool allow_moved_paths = false;
 	bool skip_schema_inference = false;
 	string mode = "default";
@@ -594,7 +560,6 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 
 	// Handle 'mode' and integrate predicate pushdown
 	if (mode == "list_files") {
-		fprintf(stderr, "Iceberg scan: Total number of files in list_files: %zu\n", data_entries.size());
 		for (const auto &entry : data_entries) {
 			auto full_path =
 			    allow_moved_paths ? IcebergUtils::GetFullPath(iceberg_path, entry.file_path, fs) : entry.file_path;
@@ -602,7 +567,6 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 		}
 		return MakeListFilesExpression(data_file_values, delete_file_values);
 	} else if (mode == "default") {
-		fprintf(stderr, "Iceberg scan: Total number of files in default mode: %zu\n", data_entries.size());
 		int64_t data_cardinality = 0, delete_cardinality = 0;
 		for (auto &manifest : iceberg_table.entries) {
 			for (auto &entry : manifest.manifest_entries) {
