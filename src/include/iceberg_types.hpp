@@ -249,7 +249,7 @@ struct IcebergManifestEntry {
                 lower_bounds[std::to_string(lb.key)] = lb.value;
             }
         } else {
-            std::cout << "Lower bounds is null" << std::endl;
+            fprintf(stderr, "Lower bounds ISSSSS null\n");
         }
 
         // Handle upper_bounds
@@ -259,7 +259,7 @@ struct IcebergManifestEntry {
                 upper_bounds[std::to_string(ub.key)] = ub.value;
             }
         } else {
-            std::cout << "Upper bounds is null" << std::endl;
+            fprintf(stderr, "Upper bounds ISSSSS null\n");
         }
     }
 
