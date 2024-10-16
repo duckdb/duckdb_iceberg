@@ -113,6 +113,24 @@ public:
 		return ret;
 	}
 
+	//! Returns all IcebergManifestEntry objects to be scanned for the given IcebergManifestContentType
+	template <IcebergManifestContentType TYPE>
+	vector<IcebergManifestEntry> GetEntries() {
+		vector<IcebergManifestEntry> ret;
+		for (auto &entry : entries) {
+			if (entry.manifest.content != TYPE) {
+				continue;
+			}
+			for (auto &manifest_entry : entry.manifest_entries) {
+				if (manifest_entry.status == IcebergManifestEntryStatusType::DELETED) {
+					continue;
+				}
+				ret.push_back(manifest_entry);
+			}
+		}
+		return ret;
+	}
+
 	void Print() {
 		Printer::Print("Iceberg table (" + path + ")");
 		for (auto &entry : entries) {
