@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/Users/mritchie712/opt/anaconda3/bin/python
 import pyspark
 import pyspark.sql
 import sys
@@ -8,7 +8,7 @@ from pyspark import SparkContext
 from pathlib import Path
 
 if (len(sys.argv) != 4 ):
-    print("Usage: generate_iceberg.py <SCALE_FACTOR> <DEST_PATH> <ICBERG_SPEC_VERSION>")
+    print("Usage: generate_iceberg.py <SCALE_FACTOR> <DEST_PATH> <ICEBERG_SPEC_VERSION>")
     exit(1)
 
 SCALE = sys.argv[1]
@@ -16,7 +16,7 @@ DEST_PATH = sys.argv[2]
 ICEBERG_SPEC_VERSION = sys.argv[3]
 
 PARQUET_SRC_FILE = f'{DEST_PATH}/base_file/file.parquet'
-TABLE_NAME = "iceberg_catalog.pyspark_iceberg_table";
+TABLE_NAME = "iceberg_catalog.pyspark_iceberg_table"
 CWD = os.getcwd()
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -26,7 +26,7 @@ SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 os.system(f"python3 {SCRIPT_DIR}/generate_base_parquet.py {SCALE} {CWD}/{DEST_PATH} spark")
 
 ###
-### Configure everyone's favorite apache product
+### Configure Spark with Iceberg
 ###
 conf = pyspark.SparkConf()
 conf.setMaster('local[*]')
@@ -42,23 +42,46 @@ sc = spark.sparkContext
 sc.setLogLevel("ERROR")
 
 ###
-### Create Iceberg table from dataset
+### Create Iceberg table from dataset with partitioning
 ###
-spark.read.parquet(PARQUET_SRC_FILE).createOrReplaceTempView('parquet_file_view');
+spark.read.parquet(PARQUET_SRC_FILE).createOrReplaceTempView('parquet_file_view')
+
+# Define your partition columns and transforms
+partition_spec = "year(l_shipdate_date), l_shipmode_string"  # Adjust 'l_shipdate_date' as needed
 
 if ICEBERG_SPEC_VERSION == '1':
-    spark.sql(f"CREATE or REPLACE TABLE {TABLE_NAME} TBLPROPERTIES ('format-version'='{ICEBERG_SPEC_VERSION}') AS SELECT * FROM parquet_file_view");
+    create_table_sql = f"""
+        CREATE OR REPLACE TABLE {TABLE_NAME}
+        USING iceberg
+        PARTITIONED BY ({partition_spec})
+        TBLPROPERTIES (
+            'format-version' = '{ICEBERG_SPEC_VERSION}'
+        )
+        AS SELECT * FROM parquet_file_view
+    """
 elif ICEBERG_SPEC_VERSION == '2':
-    spark.sql(f"CREATE or REPLACE TABLE {TABLE_NAME} TBLPROPERTIES ('format-version'='{ICEBERG_SPEC_VERSION}', 'write.update.mode'='merge-on-read') AS SELECT * FROM parquet_file_view");
+    create_table_sql = f"""
+        CREATE OR REPLACE TABLE {TABLE_NAME}
+        USING iceberg
+        PARTITIONED BY ({partition_spec})
+        TBLPROPERTIES (
+            'format-version' = '{ICEBERG_SPEC_VERSION}',
+            'write.update.mode' = 'merge-on-read'
+        )
+        AS SELECT * FROM parquet_file_view
+    """
 else:
     print(f"Are you from the future? Iceberg spec version '{ICEBERG_SPEC_VERSION}' is unbeknownst to me")
     exit(1)
+
+# Execute the CREATE TABLE statement
+spark.sql(create_table_sql)
 
 ###
 ### Apply modifications to base table generating verification results between each step
 ###
 update_files = [str(path) for path in Path(f'{SCRIPT_DIR}/updates_v{ICEBERG_SPEC_VERSION}').rglob('*.sql')]
-update_files.sort() # Order matters obviously
+update_files.sort()  # Order matters obviously
 last_file = ""
 
 for path in update_files:
@@ -82,14 +105,13 @@ for path in update_files:
 
         # Create copy of table
         df = spark.read.table(TABLE_NAME)
-        df.write.parquet(f"{DEST_PATH}/expected_results/{file_trimmed}/data");
+        df.write.parquet(f"{DEST_PATH}/expected_results/{file_trimmed}/data")
 
         # For documentation, also write the query we executed to the data
         query_path = f'{DEST_PATH}/expected_results/{file_trimmed}/query.sql'
         with open(query_path, 'w') as f:
             f.write("-- The query executed at this step:\n")
             f.write(query)
-
 
 ###
 ### Finally, we copy the latest results to a "final" dir for easy test writing

@@ -309,11 +309,6 @@ static bool EvaluatePredicateAgainstStatistics(const IcebergManifestEntry &entry
 				// Unsupported predicate structure
 				continue;
 			}
-
-			// fprintf(stderr, "  Evaluating predicate: %s\n", predicate->ToString().c_str());
-			// fprintf(stderr, "    Mapped Field ID: %s, Value: %s\n", field_id_str.c_str(),
-			//         constant_value.ToString().c_str());
-			// fprintf(stderr, "  IcebergManifestEntry bounds for field ID '%s':\n", field_id_str.c_str());
 			// fprintf(stderr, "    Lower bound: %s\n", lower_bound.ToString().c_str());
 			// fprintf(stderr, "    Upper bound: %s\n", upper_bound.ToString().c_str());
 
@@ -374,9 +369,42 @@ MakeScanExpression(const string &iceberg_path, FileSystem &fs, vector<IcebergMan
 		}
 	}
 
+	// fprintf(stderr, "Total number of data files: %zu\n", data_file_entries.size());
+	// fprintf(stderr, "Total number of filtered data files: %zu\n", filtered_data_file_values.size());
+	// fprintf(stderr, "Total number of delete files: %zu\n", delete_file_values.size());
+
 	auto cardinality = make_uniq<ComparisonExpression>(ExpressionType::COMPARE_EQUAL,
 	                                                   make_uniq<ColumnRefExpression>("explicit_cardinality"),
 	                                                   make_uniq<ConstantExpression>(Value(data_cardinality)));
+
+    // Handle the scenario with no data files
+    if (filtered_data_file_values.empty()) {
+        // **BEGIN: Handling Empty Filtered Data Files**
+        auto select_node = make_uniq<SelectNode>();
+        select_node->where_clause = make_uniq<ConstantExpression>(Value::BOOLEAN(false));
+
+        // Add select expressions for each column based on the schema
+        for (const auto &col : schema) {
+            // Create a NULL constant of the appropriate type
+            auto null_expr = make_uniq<ConstantExpression>(Value(col.type));
+            // Alias it to the column name
+            null_expr->alias = col.name;
+            select_node->select_list.emplace_back(std::move(null_expr));
+        }
+
+        // **Add the FROM clause as EmptyTableRef**
+        select_node->from_table = make_uniq<EmptyTableRef>();
+
+        // Create a SelectStatement
+        auto select_statement = make_uniq<SelectStatement>();
+        select_statement->node = std::move(select_node);
+
+        // Create a SubqueryRef with the SelectStatement
+        auto table_ref_empty = make_uniq<SubqueryRef>(std::move(select_statement), "empty_scan");
+
+        return std::move(table_ref_empty);
+        // **END: Handling Empty Filtered Data Files**
+    }
 
 	// Handle the scenario with no delete files
 	if (delete_file_values.empty()) {
@@ -466,6 +494,7 @@ MakeScanExpression(const string &iceberg_path, FileSystem &fs, vector<IcebergMan
 	select_node->select_list = std::move(select_exprs);
 	select_statement->node = std::move(select_node);
 
+	// fprintf(stderr, "Final SQL statement:\n%s\n", select_statement->ToString().c_str());
 	return make_uniq<SubqueryRef>(std::move(select_statement), "iceberg_scan");
 }
 

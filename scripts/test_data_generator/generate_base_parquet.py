@@ -46,7 +46,8 @@ if (MODE.lower() == "spark"):
                     l_commitdate::TIMESTAMPTZ as l_commitdate_timestamp_tz,
                     l_comment as l_comment_string,
                     gen_random_uuid()::VARCHAR as uuid,
-                    l_comment::BLOB as l_comment_blob
+                    l_comment::BLOB as l_comment_blob,
+                    l_shipmode as l_shipmode_string
                     FROM
                     lineitem;""");
 elif (MODE.lower() == "default"):
@@ -67,7 +68,8 @@ elif (MODE.lower() == "default"):
                     l_commitdate::TIMESTAMPTZ as l_commitdate_timestamp_tz,
                     l_comment as l_comment_string,
                     gen_random_uuid()::UUID as uuid,
-                    l_comment::BLOB as l_comment_blob
+                    l_comment::BLOB as l_comment_blob,
+                    l_shipmode as l_shipmode_string
                     FROM
                     lineitem;""");
 else:
