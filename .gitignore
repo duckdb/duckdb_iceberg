@@ -9,6 +9,8 @@ test/python/__pycache__/
 .Rhistory
 test/sql/tmp.test
 data/iceberg/generated_*
+data/iceberg/generated_*/
+data/iceberg/
 scripts/metastore_db/
 scripts/derby.log
 scripts/test-script-with-path.sql

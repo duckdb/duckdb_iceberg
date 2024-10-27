@@ -79,3 +79,27 @@ query I
 SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVED_PATHS=TRUE, METADATA_COMPRESSION_CODEC="gzip", version='2', version_name_format='v%s%s.metadata.json');
 ----
 111968
+
+### Pushdown l_shipdate with results
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE) WHERE l_shipdate >= '1996-01-01';
+----
+21674
+
+### Pushdown l_shipdate with no results
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE) WHERE l_shipdate >= '2222-01-01';
+----
+0
+
+### Pushdown l_shipmode with results
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE) WHERE l_shipmode = 'AIR';
+----
+7265
+
+### Pushdown l_shipmode with no results
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE) WHERE l_shipmode = 'FOOBAR';
+----
+0
