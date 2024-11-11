@@ -22,6 +22,10 @@ static string DEFAULT_TABLE_VERSION_FORMAT = "v%s%s.metadata.json,%s%s.metadata.
 
 static string DEFAULT_VERSION_HINT_FILE = "version-hint.text";
 
+// Will first look for DEFAULT_VERSION_HINT_FILE then search for versions
+// matching the DEFAULT_TABLE_VERSION_FORMAT, taking the "last" one
+static string DEFAULT_TABLE_VERSION = "?";
+
 struct IcebergColumnDefinition {
 public:
 	static IcebergColumnDefinition ParseFromJson(yyjson_val *val);
@@ -81,6 +85,8 @@ public:
 protected:
 	//! Internal JSON parsing functions
 	static string GetTableVersion(const string &path, FileSystem &fs, string version_format);
+	static string GuessTableVersion(const string &meta_path, FileSystem &fs, string &table_version, string &metadata_compression_codec, string &version_format);
+	static string PickTableVersion(vector<string> &found, string &table_version);
 	static yyjson_val *FindLatestSnapshotInternal(yyjson_val *snapshots);
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);

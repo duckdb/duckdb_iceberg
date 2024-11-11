@@ -225,7 +225,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	bool skip_schema_inference = false;
 	string mode = "default";
 	string metadata_compression_codec = "none";
-	string table_version = DEFAULT_VERSION_HINT_FILE;
+	string table_version = DEFAULT_TABLE_VERSION;
 	string version_name_format = DEFAULT_TABLE_VERSION_FORMAT;
 
 	for (auto &kv : input.named_parameters) {

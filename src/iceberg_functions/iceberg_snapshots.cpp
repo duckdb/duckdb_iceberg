@@ -55,7 +55,7 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	auto bind_data = make_uniq<IcebergSnaphotsBindData>();
 	
 	string metadata_compression_codec = "none";
-	string table_version = DEFAULT_VERSION_HINT_FILE;
+	string table_version = DEFAULT_TABLE_VERSION;
 	string version_name_format = DEFAULT_TABLE_VERSION_FORMAT;
 	bool skip_schema_inference = false;
 	
