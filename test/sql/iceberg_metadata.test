@@ -51,4 +51,4 @@ lineitem_iceberg_gz/metadata/23f9dbea-1e7f-4694-a82c-dc3c9a94953e-m0.avro	0	DATA
 statement error
 SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg_nonexistent');
 ----
-IO Error: Cannot open file
+IO Error: Could not guess Iceberg table version using 'none' compression and format(s): 'v%s%s.metadata.json,%s%s.metadata.json'

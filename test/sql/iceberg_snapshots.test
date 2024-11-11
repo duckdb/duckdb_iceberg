@@ -41,7 +41,7 @@ SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg', version='1');
 statement error
 SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_nonexistent');
 ----
-IO Error: Cannot open file "data/iceberg/lineitem_iceberg_nonexistent/metadata/version-hint.text": No such file or directory
+IO Error: Could not guess Iceberg table version using 'none' compression and format(s): 'v%s%s.metadata.json,%s%s.metadata.json'
 
 statement error
 SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_gz');

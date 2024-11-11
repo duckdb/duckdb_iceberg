@@ -100,3 +100,13 @@ SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVE
 ----
 IO Error: No snapshots found
 
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_no_hint', ALLOW_MOVED_PATHS=TRUE);
+----
+111968
+
+query I
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz_no_hint', ALLOW_MOVED_PATHS=TRUE, metadata_compression_codec="gzip");
+----
+111968
+
