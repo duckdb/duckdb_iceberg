@@ -276,7 +276,7 @@ string IcebergSnapshot::GuessTableVersion(const string &meta_path, FileSystem &f
 	}
 
 	throw IOException(
-		"Could not guess Iceberg table version using '%s' compression and format(s): '%s'", table_version, metadata_compression_codec, version_format);
+		"Could not guess Iceberg table version using '%s' compression and format(s): '%s'", metadata_compression_codec, version_format);
 }
 
 string IcebergSnapshot::PickTableVersion(vector<string> &found, string &table_version) {
