@@ -86,7 +86,7 @@ protected:
 	//! Internal JSON parsing functions
 	static string GetTableVersion(const string &path, FileSystem &fs, string version_format);
 	static string GuessTableVersion(const string &meta_path, FileSystem &fs, string &table_version, string &metadata_compression_codec, string &version_format);
-	static string PickTableVersion(vector<string> &found, string &table_version);
+	static string PickTableVersion(vector<string> &found_metadata, string &version_pattern, string &glob);
 	static yyjson_val *FindLatestSnapshotInternal(yyjson_val *snapshots);
 	static yyjson_val *FindSnapshotByIdInternal(yyjson_val *snapshots, idx_t target_id);
 	static yyjson_val *FindSnapshotByIdTimestampInternal(yyjson_val *snapshots, timestamp_t timestamp);
