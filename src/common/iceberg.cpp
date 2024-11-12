@@ -189,23 +189,26 @@ string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, string &tabl
 
 
 string IcebergSnapshot::GetMetaDataPath(const string &path, FileSystem &fs, string metadata_compression_codec, string table_version = DEFAULT_TABLE_VERSION, string version_format = DEFAULT_TABLE_VERSION_FORMAT) {
-	bool hint_is_metadata = false;
 	string version_hint;
+	string meta_path = fs.JoinPath(path, "metadata");
+	bool hint_is_metadata = false;
+
 	if (StringUtil::EndsWith(path, ".json")) {
+		// We've been given a real metadata path. Do nothing
 		version_hint = path;
 		hint_is_metadata = true;
-	}
-
-	auto meta_path = fs.JoinPath(path, "metadata");
-	if(StringUtil::EndsWith(table_version, ".text")||StringUtil::EndsWith(table_version, ".txt")) {
+	} else if (StringUtil::EndsWith(table_version, ".text")||StringUtil::EndsWith(table_version, ".txt")) {
+		// We have been provided a hint file
 		version_hint = GetTableVersion(meta_path, fs, table_version);
-	} else if(!StringUtil::StartsWith(table_version, "?")) {
+	} else if (!StringUtil::StartsWith(table_version, "?")) {
+		// We have a specific version supplied. No guessing here
 		// TODO: Could add more options here: e.g., ?latest or ?largest
 		version_hint = table_version;
-	} else if(fs.FileExists(fs.JoinPath(meta_path, DEFAULT_VERSION_HINT_FILE))) {
-		// Try to use a version-hint file
+	} else if (fs.FileExists(fs.JoinPath(meta_path, DEFAULT_VERSION_HINT_FILE))) {
+		// Try to use the existing version-hint file
 		version_hint = GetTableVersion(meta_path, fs, DEFAULT_VERSION_HINT_FILE);
 	} else {
+		// We need to guess the latest version from available metadata files
 		version_hint = GuessTableVersion(meta_path, fs, table_version, metadata_compression_codec, version_format);
 		hint_is_metadata = true;
 	}
