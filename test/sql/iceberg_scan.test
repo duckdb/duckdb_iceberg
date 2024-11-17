@@ -81,32 +81,31 @@ SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVE
 111968
 
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE);
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_no_hint', '2023-02-15 15:07:54.504'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);
 ----
-111968
+60175
 
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', version="?", ALLOW_MOVED_PATHS=TRUE);
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_no_hint', '2023-02-15 15:07:54.729'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);
 ----
-111968
+60175
 
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVED_PATHS=TRUE, metadata_compression_codec="gzip");
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_no_hint', '2023-02-15 15:08:14.73'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);
 ----
-111968
+51793
 
 statement error
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVED_PATHS=TRUE, METADATA_COMPRESSION_CODEC="gzip", version="?", vesion_name_format="version%s%s.metadata.json");
+FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_no_hint', '2023-02-15 15:07:54.503'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);
 ----
-IO Error: No snapshots found
+IO Error: Could not find latest snapshots for timestamp 2023-02-15 15:07:54.503
 
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_no_hint', ALLOW_MOVED_PATHS=TRUE);
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz_no_hint', ALLOW_MOVED_PATHS=TRUE, METADATA_COMPRESSION_CODEC="gzip");
 ----
 111968
 
 query I
-SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz_no_hint', ALLOW_MOVED_PATHS=TRUE, metadata_compression_codec="gzip");
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz_no_hint', ALLOW_MOVED_PATHS=TRUE, METADATA_COMPRESSION_CODEC="gzip", version='2', version_name_format='v%s%s.metadata.json');
 ----
 111968
-

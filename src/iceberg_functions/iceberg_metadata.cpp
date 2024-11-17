@@ -53,6 +53,7 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 
 	FileSystem &fs = FileSystem::GetFileSystem(context);
 	auto iceberg_path = input.inputs[0].ToString();
+
 	bool allow_moved_paths = false;
 	string metadata_compression_codec = "none";
 	bool skip_schema_inference = false;
