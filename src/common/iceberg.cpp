@@ -212,7 +212,7 @@ string IcebergSnapshot::GetMetaDataPath(ClientContext &context, const string &pa
 	} else {
 		Value result;
 		(void)context.TryGetCurrentSetting("unsafe_enable_version_guessing", result);
-		if (!result.GetValue<bool>()) {
+		if (result.IsNull() || !result.GetValue<bool>()) {
 			throw InvalidInputException("No version was provided and no version-hint could be found, globbing the filesystem to locate the latest version is disabled by default as this is considered unsafe and could result in reading uncommitted data. To enable this use 'SET unsafe_enable_version_guessing = true;'");
 		}
 
