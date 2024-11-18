@@ -33,7 +33,7 @@ public:
 		FileSystem &fs = FileSystem::GetFileSystem(context);
 
 		auto iceberg_meta_path = IcebergSnapshot::GetMetaDataPath(
-		    bind_data.filename, fs, bind_data.metadata_compression_codec, bind_data.table_version, bind_data.version_name_format);
+		    context, bind_data.filename, fs, bind_data.metadata_compression_codec, bind_data.table_version, bind_data.version_name_format);
 		global_state->metadata_file = IcebergSnapshot::ReadMetaData(iceberg_meta_path, fs,  bind_data.metadata_compression_codec);
 		global_state->metadata_doc =
 		    yyjson_read(global_state->metadata_file.c_str(), global_state->metadata_file.size(), 0);

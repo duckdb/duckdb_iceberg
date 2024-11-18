@@ -53,6 +53,14 @@ SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg_nonexistent');
 ----
 IO Error: Cannot open "data/iceberg/lineitem_iceberg_nonexistent": Metadata directory does not exist
 
+statement error
+SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg_no_hint', ALLOW_MOVED_PATHS=TRUE);
+----
+<REGEX>:.*SET unsafe_enable_version_guessing.*
+
+statement ok
+SET unsafe_enable_version_guessing = true;
+
 query IIIIIIII
 SELECT * FROM ICEBERG_METADATA('data/iceberg/lineitem_iceberg_no_hint', ALLOW_MOVED_PATHS=TRUE);
 ----

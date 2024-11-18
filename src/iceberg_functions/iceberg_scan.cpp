@@ -248,7 +248,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 			version_name_format = StringValue::Get(kv.second);
 		}
 	}
-	auto iceberg_meta_path = IcebergSnapshot::GetMetaDataPath(iceberg_path, fs, metadata_compression_codec, table_version, version_name_format);
+	auto iceberg_meta_path = IcebergSnapshot::GetMetaDataPath(context, iceberg_path, fs, metadata_compression_codec, table_version, version_name_format);
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {

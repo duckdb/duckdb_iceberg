@@ -188,7 +188,7 @@ string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, string &tabl
 }
 
 
-string IcebergSnapshot::GetMetaDataPath(const string &path, FileSystem &fs, string metadata_compression_codec, string table_version = DEFAULT_TABLE_VERSION, string version_format = DEFAULT_TABLE_VERSION_FORMAT) {
+string IcebergSnapshot::GetMetaDataPath(ClientContext &context, const string &path, FileSystem &fs, string metadata_compression_codec, string table_version = DEFAULT_TABLE_VERSION, string version_format = DEFAULT_TABLE_VERSION_FORMAT) {
 	string version_hint;
 	string meta_path = fs.JoinPath(path, "metadata");
 	if (StringUtil::EndsWith(path, ".json")) {
@@ -210,6 +210,12 @@ string IcebergSnapshot::GetMetaDataPath(const string &path, FileSystem &fs, stri
 		version_hint = GetTableVersionFromHint(meta_path, fs, DEFAULT_VERSION_HINT_FILE);
 		return GenerateMetaDataUrl(fs, meta_path, version_hint, metadata_compression_codec, version_format);
 	} else {
+		Value result;
+		(void)context.TryGetCurrentSetting("unsafe_enable_version_guessing", result);
+		if (!result.GetValue<bool>()) {
+			throw InvalidInputException("No version was provided and no version-hint could be found, globbing the filesystem to locate the latest version is disabled by default as this is considered unsafe and could result in reading uncommitted data. To enable this use 'SET unsafe_enable_version_guessing = true;'");
+		}
+
 		// We need to guess from file paths
 		return GuessTableVersion(meta_path, fs, table_version, metadata_compression_codec, version_format);
 	}

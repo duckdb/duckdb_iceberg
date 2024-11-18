@@ -77,7 +77,7 @@ public:
 
 	static IcebergSnapshot ParseSnapShot(yyjson_val *snapshot, idx_t iceberg_format_version, idx_t schema_id,
 	                                     vector<yyjson_val *> &schemas, string metadata_compression_codec, bool skip_schema_inference);
-	static string GetMetaDataPath(const string &path, FileSystem &fs, string metadata_compression_codec, string table_version, string version_format);
+	static string GetMetaDataPath(ClientContext &context, const string &path, FileSystem &fs, string metadata_compression_codec, string table_version, string version_format);
 	static string ReadMetaData(const string &path, FileSystem &fs, string metadata_compression_codec);
 	static yyjson_val *GetSnapshots(const string &path, FileSystem &fs, string GetSnapshotByTimestamp);
 	static unique_ptr<SnapshotParseInfo> GetParseInfo(yyjson_doc &metadata_json);
