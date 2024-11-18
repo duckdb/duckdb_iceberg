@@ -14,11 +14,11 @@ set(EXTENSION_SOURCES
     src/iceberg_extension.cpp
     src/iceberg_functions.cpp
     src/common/utils.cpp
+    src/common/schema.cpp
     src/common/iceberg.cpp
     src/iceberg_functions/iceberg_snapshots.cpp
     src/iceberg_functions/iceberg_scan.cpp
-    src/iceberg_functions/iceberg_metadata.cpp
-    src/yyjson/yyjson.cpp)
+    src/iceberg_functions/iceberg_metadata.cpp)
 
 add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
 

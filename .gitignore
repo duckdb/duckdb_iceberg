@@ -1,4 +1,5 @@
 build
+.vscode
 .idea
 cmake-build-debug
 duckdb_unittest_tempdir/
@@ -8,3 +9,6 @@ test/python/__pycache__/
 .Rhistory
 test/sql/tmp.test
 data/iceberg/generated_*
+scripts/metastore_db/
+scripts/derby.log
+scripts/test-script-with-path.sql
