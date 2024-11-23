@@ -12,6 +12,7 @@ require parquet
 
 require iceberg
 
+
 ### Scanning latest snapshot
 query I
 SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg', ALLOW_MOVED_PATHS=TRUE);
@@ -79,6 +80,14 @@ query I
 SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_gz', ALLOW_MOVED_PATHS=TRUE, METADATA_COMPRESSION_CODEC="gzip", version='2', version_name_format='v%s%s.metadata.json');
 ----
 111968
+
+statement error
+SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_no_hint', ALLOW_MOVED_PATHS=TRUE);
+----
+<REGEX>:.*SET unsafe_enable_version_guessing.*
+
+statement ok
+SET unsafe_enable_version_guessing=true;
 
 query I
 SELECT count(*) FROM ICEBERG_SCAN('data/iceberg/lineitem_iceberg_no_hint', '2023-02-15 15:07:54.504'::TIMESTAMP, ALLOW_MOVED_PATHS=TRUE);

@@ -58,6 +58,9 @@ SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_gz', metadata_com
 ----
 0	4468019210336628573	2024-03-13 18:38:58.602	lineitem_iceberg_gz/metadata/snap-4468019210336628573-1-23f9dbea-1e7f-4694-a82c-dc3c9a94953e.avro
 
+statement ok
+SET unsafe_enable_version_guessing=true;
+
 query IIII
 SELECT * FROM ICEBERG_SNAPSHOTS('data/iceberg/lineitem_iceberg_no_hint');
 ----
