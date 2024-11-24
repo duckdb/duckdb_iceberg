@@ -196,30 +196,26 @@ string IcebergSnapshot::GetMetaDataPath(ClientContext &context, const string &pa
 		return path;
 	} else if (!fs.DirectoryExists(meta_path)) {
 		// Make sure we have a metadata directory to look in
-		throw IOException("Cannot open \""+path+"\": Metadata directory does not exist");
+		throw IOException("Cannot open \"%s\": Metadata directory does not exist", path);
 	} else if(StringUtil::EndsWith(table_version, ".text")||StringUtil::EndsWith(table_version, ".txt")) {
 		// We were given a hint filename
 		version_hint = GetTableVersionFromHint(meta_path, fs, table_version);
 		return GenerateMetaDataUrl(fs, meta_path, version_hint, metadata_compression_codec, version_format);
-	} else if(!StringUtil::StartsWith(table_version, "?")) {
+	} else if (table_version != UNKNOWN_TABLE_VERSION) {
 		// We were given an explicit version number
 		version_hint = table_version;
 		return GenerateMetaDataUrl(fs, meta_path, version_hint, metadata_compression_codec, version_format);
-	} else if(fs.FileExists(fs.JoinPath(meta_path, DEFAULT_VERSION_HINT_FILE))) {
+	} else if (fs.FileExists(fs.JoinPath(meta_path, DEFAULT_VERSION_HINT_FILE))) {
 		// We're guessing, but a version-hint.text exists so we'll use that
 		version_hint = GetTableVersionFromHint(meta_path, fs, DEFAULT_VERSION_HINT_FILE);
 		return GenerateMetaDataUrl(fs, meta_path, version_hint, metadata_compression_codec, version_format);
+	} else if (!UnsafeVersionGuessingEnabled(context)) {
+		// Make sure we're allowed to guess versions
+		throw InvalidInputException("No version was provided and no version-hint could be found, globbing the filesystem to locate the latest version is disabled by default as this is considered unsafe and could result in reading uncommitted data. To enable this use 'SET %s = true;'", VERSION_GUESSING_CONFIG_VARIABLE);
 	} else {
-		Value result;
-		(void)context.TryGetCurrentSetting("unsafe_enable_version_guessing", result);
-		if (result.IsNull() || !result.GetValue<bool>()) {
-			throw InvalidInputException("No version was provided and no version-hint could be found, globbing the filesystem to locate the latest version is disabled by default as this is considered unsafe and could result in reading uncommitted data. To enable this use 'SET unsafe_enable_version_guessing = true;'");
-		}
-
-		// We need to guess from file paths
+		// We are allowed to guess to guess from file paths
 		return GuessTableVersion(meta_path, fs, table_version, metadata_compression_codec, version_format);
 	}
-
 }
 
 
@@ -270,10 +266,19 @@ string IcebergSnapshot::GetTableVersionFromHint(const string &meta_path, FileSys
 	}
 }
 
+bool IcebergSnapshot::UnsafeVersionGuessingEnabled(ClientContext &context) {
+	Value result;
+	(void)context.TryGetCurrentSetting(VERSION_GUESSING_CONFIG_VARIABLE, result);
+	return !result.IsNull() && result.GetValue<bool>();
+}
+
+
 string IcebergSnapshot::GuessTableVersion(const string &meta_path, FileSystem &fs, string &table_version, string &metadata_compression_codec, string &version_format = DEFAULT_TABLE_VERSION_FORMAT) {
 	string selected_metadata;
 	string version_pattern = "*"; // TODO: Different "table_version" strings could customize this
 	string compression_suffix = "";
+	
+
 	if (metadata_compression_codec == "gzip") {
 		compression_suffix = ".gz";
 	}
@@ -298,8 +303,12 @@ string IcebergSnapshot::GuessTableVersion(const string &meta_path, FileSystem &f
 string IcebergSnapshot::PickTableVersion(vector<string> &found_metadata, string &version_pattern, string &glob) {
 	// TODO: Different "table_version" strings could customize this
 	// For now: just sort the versions and take the largest
-	std::sort(found_metadata.begin(), found_metadata.end());
-	return found_metadata.back();
+	if(!found_metadata.empty()) {
+		std::sort(found_metadata.begin(), found_metadata.end());
+		return found_metadata.back();
+	} else {
+		return string();
+	}
 }
 
 
