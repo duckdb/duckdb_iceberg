@@ -57,7 +57,7 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 	bool allow_moved_paths = false;
 	string metadata_compression_codec = "none";
 	bool skip_schema_inference = false;
-	string table_version = DEFAULT_VERSION_HINT_FILE;
+	string table_version = DEFAULT_TABLE_VERSION;
 	string version_name_format = DEFAULT_TABLE_VERSION_FORMAT;
 	
 	for (auto &kv : input.named_parameters) {
@@ -75,7 +75,7 @@ static unique_ptr<FunctionData> IcebergMetaDataBind(ClientContext &context, Tabl
 		}
 	}
 
-	auto iceberg_meta_path = IcebergSnapshot::GetMetaDataPath(iceberg_path, fs, metadata_compression_codec, table_version, version_name_format);
+	auto iceberg_meta_path = IcebergSnapshot::GetMetaDataPath(context, iceberg_path, fs, metadata_compression_codec, table_version, version_name_format);
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {

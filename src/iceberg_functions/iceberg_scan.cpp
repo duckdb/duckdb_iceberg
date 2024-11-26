@@ -225,7 +225,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 	bool skip_schema_inference = false;
 	string mode = "default";
 	string metadata_compression_codec = "none";
-	string table_version = DEFAULT_VERSION_HINT_FILE;
+	string table_version = DEFAULT_TABLE_VERSION;
 	string version_name_format = DEFAULT_TABLE_VERSION_FORMAT;
 
 	for (auto &kv : input.named_parameters) {
@@ -248,7 +248,7 @@ static unique_ptr<TableRef> IcebergScanBindReplace(ClientContext &context, Table
 			version_name_format = StringValue::Get(kv.second);
 		}
 	}
-	auto iceberg_meta_path = IcebergSnapshot::GetMetaDataPath(iceberg_path, fs, metadata_compression_codec, table_version, version_name_format);
+	auto iceberg_meta_path = IcebergSnapshot::GetMetaDataPath(context, iceberg_path, fs, metadata_compression_codec, table_version, version_name_format);
 	IcebergSnapshot snapshot_to_scan;
 	if (input.inputs.size() > 1) {
 		if (input.inputs[1].type() == LogicalType::UBIGINT) {

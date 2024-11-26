@@ -33,7 +33,7 @@ public:
 		FileSystem &fs = FileSystem::GetFileSystem(context);
 
 		auto iceberg_meta_path = IcebergSnapshot::GetMetaDataPath(
-		    bind_data.filename, fs, bind_data.metadata_compression_codec, bind_data.table_version, bind_data.version_name_format);
+		    context, bind_data.filename, fs, bind_data.metadata_compression_codec, bind_data.table_version, bind_data.version_name_format);
 		global_state->metadata_file = IcebergSnapshot::ReadMetaData(iceberg_meta_path, fs,  bind_data.metadata_compression_codec);
 		global_state->metadata_doc =
 		    yyjson_read(global_state->metadata_file.c_str(), global_state->metadata_file.size(), 0);
@@ -55,7 +55,7 @@ static unique_ptr<FunctionData> IcebergSnapshotsBind(ClientContext &context, Tab
 	auto bind_data = make_uniq<IcebergSnaphotsBindData>();
 	
 	string metadata_compression_codec = "none";
-	string table_version = DEFAULT_VERSION_HINT_FILE;
+	string table_version = DEFAULT_TABLE_VERSION;
 	string version_name_format = DEFAULT_TABLE_VERSION_FORMAT;
 	bool skip_schema_inference = false;
 	

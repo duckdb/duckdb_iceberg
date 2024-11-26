@@ -188,19 +188,34 @@ string GenerateMetaDataUrl(FileSystem &fs, const string &meta_path, string &tabl
 }
 
 
-string IcebergSnapshot::GetMetaDataPath(const string &path, FileSystem &fs, string metadata_compression_codec, string table_version = DEFAULT_VERSION_HINT_FILE, string version_format = DEFAULT_TABLE_VERSION_FORMAT) {
-	if (StringUtil::EndsWith(path, ".json")) {
-		return path;
-	}
-
-	auto meta_path = fs.JoinPath(path, "metadata");
+string IcebergSnapshot::GetMetaDataPath(ClientContext &context, const string &path, FileSystem &fs, string metadata_compression_codec, string table_version = DEFAULT_TABLE_VERSION, string version_format = DEFAULT_TABLE_VERSION_FORMAT) {
 	string version_hint;
-		if(StringUtil::EndsWith(table_version, ".text")||StringUtil::EndsWith(table_version, ".txt")) {
-		version_hint = GetTableVersion(meta_path, fs, table_version);
-	} else {
+	string meta_path = fs.JoinPath(path, "metadata");
+	if (StringUtil::EndsWith(path, ".json")) {
+		// We've been given a real metadata path. Nothing else to do.
+		return path;
+	} else if (!fs.DirectoryExists(meta_path)) {
+		// Make sure we have a metadata directory to look in
+		throw IOException("Cannot open \"%s\": Metadata directory does not exist", path);
+	} else if(StringUtil::EndsWith(table_version, ".text")||StringUtil::EndsWith(table_version, ".txt")) {
+		// We were given a hint filename
+		version_hint = GetTableVersionFromHint(meta_path, fs, table_version);
+		return GenerateMetaDataUrl(fs, meta_path, version_hint, metadata_compression_codec, version_format);
+	} else if (table_version != UNKNOWN_TABLE_VERSION) {
+		// We were given an explicit version number
 		version_hint = table_version;
+		return GenerateMetaDataUrl(fs, meta_path, version_hint, metadata_compression_codec, version_format);
+	} else if (fs.FileExists(fs.JoinPath(meta_path, DEFAULT_VERSION_HINT_FILE))) {
+		// We're guessing, but a version-hint.text exists so we'll use that
+		version_hint = GetTableVersionFromHint(meta_path, fs, DEFAULT_VERSION_HINT_FILE);
+		return GenerateMetaDataUrl(fs, meta_path, version_hint, metadata_compression_codec, version_format);
+	} else if (!UnsafeVersionGuessingEnabled(context)) {
+		// Make sure we're allowed to guess versions
+		throw InvalidInputException("No version was provided and no version-hint could be found, globbing the filesystem to locate the latest version is disabled by default as this is considered unsafe and could result in reading uncommitted data. To enable this use 'SET %s = true;'", VERSION_GUESSING_CONFIG_VARIABLE);
+	} else {
+		// We are allowed to guess to guess from file paths
+		return GuessTableVersion(meta_path, fs, table_version, metadata_compression_codec, version_format);
 	}
-	return GenerateMetaDataUrl(fs, meta_path, version_hint, metadata_compression_codec, version_format);
 }
 
 
@@ -238,7 +253,7 @@ IcebergSnapshot IcebergSnapshot::ParseSnapShot(yyjson_val *snapshot, idx_t icebe
 	return ret;
 }
 
-string IcebergSnapshot::GetTableVersion(const string &meta_path, FileSystem &fs, string version_file = DEFAULT_VERSION_HINT_FILE) {
+string IcebergSnapshot::GetTableVersionFromHint(const string &meta_path, FileSystem &fs, string version_file = DEFAULT_VERSION_HINT_FILE) {
 	auto version_file_path = fs.JoinPath(meta_path, version_file);
 	auto version_file_content = IcebergUtils::FileToString(version_file_path, fs);
 
@@ -250,6 +265,52 @@ string IcebergSnapshot::GetTableVersion(const string &meta_path, FileSystem &fs,
 		throw IOException("Iceberg version hint file contains invalid value");
 	}
 }
+
+bool IcebergSnapshot::UnsafeVersionGuessingEnabled(ClientContext &context) {
+	Value result;
+	(void)context.TryGetCurrentSetting(VERSION_GUESSING_CONFIG_VARIABLE, result);
+	return !result.IsNull() && result.GetValue<bool>();
+}
+
+
+string IcebergSnapshot::GuessTableVersion(const string &meta_path, FileSystem &fs, string &table_version, string &metadata_compression_codec, string &version_format = DEFAULT_TABLE_VERSION_FORMAT) {
+	string selected_metadata;
+	string version_pattern = "*"; // TODO: Different "table_version" strings could customize this
+	string compression_suffix = "";
+	
+
+	if (metadata_compression_codec == "gzip") {
+		compression_suffix = ".gz";
+	}
+	
+	for(auto try_format : StringUtil::Split(version_format, ',')) {
+		auto glob_pattern = StringUtil::Format(try_format, version_pattern, compression_suffix);
+		
+		auto found_versions = fs.Glob(fs.JoinPath(meta_path, glob_pattern));
+		if(found_versions.size() > 0) {
+			selected_metadata = PickTableVersion(found_versions, version_pattern, glob_pattern);
+			if(!selected_metadata.empty()) {  // Found one
+				return selected_metadata;
+			}
+		}
+	}
+	
+	throw IOException(
+	        "Could not guess Iceberg table version using '%s' compression and format(s): '%s'",
+	        metadata_compression_codec, version_format);
+}
+
+string IcebergSnapshot::PickTableVersion(vector<string> &found_metadata, string &version_pattern, string &glob) {
+	// TODO: Different "table_version" strings could customize this
+	// For now: just sort the versions and take the largest
+	if(!found_metadata.empty()) {
+		std::sort(found_metadata.begin(), found_metadata.end());
+		return found_metadata.back();
+	} else {
+		return string();
+	}
+}
+
 
 yyjson_val *IcebergSnapshot::FindLatestSnapshotInternal(yyjson_val *snapshots) {
 	size_t idx, max;
