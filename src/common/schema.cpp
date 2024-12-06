@@ -6,7 +6,7 @@ namespace duckdb {
 // https://iceberg.apache.org/spec/#schemas
 
 // forward declaration
-static LogicalType ParseType(yyjson_val *type);
+static LogicalType ParseTypeValue(yyjson_val *type);
 
 static LogicalType ParseStruct(yyjson_val *struct_type) {
 	D_ASSERT(yyjson_get_type(struct_type) == YYJSON_TYPE_OBJ);
@@ -21,7 +21,7 @@ static LogicalType ParseStruct(yyjson_val *struct_type) {
 		// NOTE: 'id', 'required', 'doc', 'initial_default', 'write_default' are ignored for now
 		auto name = IcebergUtils::TryGetStrFromObject(field, "name");
 		auto type_item = yyjson_obj_get(field, "type");
-		auto type = ParseType(type_item);
+		auto type = ParseTypeValue(type_item);
 		children.push_back(std::make_pair(name, type));
 	}
 	return LogicalType::STRUCT(std::move(children));
@@ -33,7 +33,7 @@ static LogicalType ParseList(yyjson_val *list_type) {
 
 	// NOTE: 'element-id', 'element-required' are ignored for now
 	auto element = yyjson_obj_get(list_type, "element");
-	auto child_type = ParseType(element);
+	auto child_type = ParseTypeValue(element);
 	return LogicalType::LIST(child_type);
 }
 
@@ -45,8 +45,8 @@ static LogicalType ParseMap(yyjson_val *map_type) {
 	auto key = yyjson_obj_get(map_type, "key");
 	auto value = yyjson_obj_get(map_type, "value");
 
-	auto key_type = ParseType(key);
-	auto value_type = ParseType(value);
+	auto key_type = ParseTypeValue(key);
+	auto value_type = ParseTypeValue(value);
 	return LogicalType::MAP(key_type, value_type);
 }
 
@@ -67,18 +67,21 @@ static LogicalType ParseComplexType(yyjson_val *type) {
 }
 
 static LogicalType ParseType(yyjson_val *type) {
-	auto type_str = IcebergUtils::TryGetStrFromObject(type, "type");
-
 	auto val = yyjson_obj_get(type, "type");
 	if (!val) {
 		throw IOException("Invalid field found while parsing field: type");
 	}
+	return ParseTypeValue(val);
+}
+
+static LogicalType ParseTypeValue(yyjson_val *val) {
 	if (yyjson_get_type(val) == YYJSON_TYPE_OBJ) {
 		return ParseComplexType(val);
 	}
 	if (yyjson_get_type(val) != YYJSON_TYPE_STR) {
 		throw IOException("Invalid field found while parsing field: type");
 	}
+	string type_str = yyjson_get_str(val);
 
 	if (type_str == "boolean") {
 		return LogicalType::BOOLEAN;
